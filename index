@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>하노이의 탑</title>
+  <style>
+    :root{
+      --bg1:#0f172a; /* slate-900 */
+      --bg2:#1f2937; /* gray-800 */
+      --accent:#22d3ee; /* cyan-400 */
+      --accent-2:#a78bfa; /* violet-400 */
+      --good:#34d399; /* emerald-400 */
+      --warn:#f59e0b; /* amber-500 */
+      --danger:#ef4444; /* red-500 */
+      --peg:#cbd5e1; /* slate-300 */
+    }
+    *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+    html,body{height:100%;margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Pretendard,Apple SD Gothic Neo,Noto Sans KR,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji";color:#e5e7eb;background: radial-gradient(1000px 600px at 50% 0%, #111827 0%, var(--bg1) 40%, #0b1220 100%);}    
+    .container{min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px}
+    .card{width:min(1100px, 96vw);background:linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));backdrop-filter: blur(6px);border:1px solid rgba(255,255,255,0.08);border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,0.35);padding:24px}
+    h1{margin:0 0 12px;font-weight:800;letter-spacing:-0.02em}
+    .title{font-size:clamp(28px, 4vw, 48px);background:linear-gradient(90deg, var(--accent), var(--accent-2));-webkit-background-clip:text;background-clip:text;color:transparent}
+    .sub{opacity:.8;margin:0 0 16px}
+    .btn{cursor:pointer;display:inline-flex;align-items:center;gap:10px;border:none;border-radius:14px;padding:14px 20px;font-size:16px;font-weight:700;background:linear-gradient(90deg,var(--accent),var(--accent-2));color:#0b1220;box-shadow:0 10px 30px rgba(34,211,238,.25);transition:transform .12s ease, box-shadow .2s ease}
+    .btn:active{transform:translateY(1px)}
+    .btn.secondary{background:#111827;color:#e5e7eb;border:1px solid rgba(255,255,255,0.1);box-shadow:none}
+    .row{display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+
+    /* GAME */
+    #gameWrap{display:none;margin-top:12px}
+    .hud{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:8px 0 16px}
+    .hud .stats{display:flex;gap:14px;flex-wrap:wrap}
+    .pill{border:1px solid rgba(255,255,255,.1);padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.04)}
+    .pill strong{color:#fff}
+
+    .board{position:relative; width:100%; aspect-ratio: 16/8; min-height:420px; background:linear-gradient(180deg,#0f172a 0%,#0b1220 40%, #050a15 100%); border-radius:16px; border:1px solid rgba(255,255,255,.08); overflow:hidden}
+    .ground{position:absolute; left:0; right:0; bottom:0; height:22%; background:linear-gradient(180deg, rgba(34,211,238,.08), rgba(167,139,250,.06)); border-top:1px solid rgba(255,255,255,.06)}
+
+    .peg-area{position:absolute; inset:8% 4% 22% 4%; display:grid; grid-template-columns:repeat(3,1fr); align-items:end; gap:2%}
+    .peg{position:relative; height:100%; display:flex; justify-content:center; align-items:flex-end; cursor:pointer}
+    .peg::before{content:""; position:absolute; bottom:0; width:78%; height:12px; background:rgba(203,213,225,.9); border-radius:999px; box-shadow:inset 0 0 0 2px rgba(15,23,42,.35)}
+    .stick{position:absolute; bottom:12px; width:14px; height:78%; background:linear-gradient(180deg,#e5e7eb,#cbd5e1); border-radius:10px; box-shadow:inset 0 0 0 2px rgba(15,23,42,.25)}
+
+    .disc{position:absolute; height:34px; border-radius:999px; display:flex; align-items:center; justify-content:center; font-weight:800; text-shadow:0 1px 0 rgba(0,0,0,.3); user-select:none; touch-action:none; pointer-events:auto; transition: transform .12s ease}
+    .disc .label{font-size:12px; opacity:.9}
+    .disc.locked{pointer-events:none; filter:grayscale(.6) brightness(.9) opacity(.9)}
+    .disc.selected{transform: translateY(-14px) scale(1.02); box-shadow: 0 16px 40px rgba(34,211,238,.35)}
+
+    /* Animated clone */
+    .flying{position:absolute; z-index:40; border-radius:999px; display:flex; align-items:center; justify-content:center; font-weight:800;}
+
+    /* overlays */
+    .overlay{position:fixed; inset:0; display:none; place-items:center; background:rgba(2,6,23,.6); backdrop-filter: blur(6px);}
+    .modal{width:min(680px, 92vw); background:linear-gradient(180deg, rgba(255,255,255,.09), rgba(255,255,255,.03)); border:1px solid rgba(255,255,255,.12); border-radius:18px; padding:20px}
+    .modal h2{margin:0 0 8px; font-size:28px}
+    .modal .grid{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+    table{width:100%; border-collapse: collapse; overflow:hidden; border-radius:12px}
+    th,td{padding:10px; border-bottom:1px solid rgba(255,255,255,.08); text-align:center}
+    th{background:rgba(255,255,255,.06)}
+
+    @media (max-width:760px){
+      .board{aspect-ratio: 3/4; min-height: 520px}
+      .disc{height:28px}
+      .peg::before{height:10px}
+      .stick{width:12px}
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <!-- START SCREEN -->
+      <section id="startScreen">
+        <h1 class="title">하노이의 탑</h1>
+        <p class="sub">3개의 기둥과 서로 다른 크기의 원반들. <br/>큰 원반은 작은 원반 위에 놓을 수 없습니다. 한 번에 하나만 옮기세요!</p>
+        <div class="row">
+          <button class="btn" id="btnStart">게임 시작</button>
+        </div>
+      </section>
+
+      <!-- GAME -->
+      <section id="gameWrap">
+        <div class="hud">
+          <div class="stats">
+            <div class="pill">스테이지 <strong id="stageLabel">1</strong> / 6</div>
+            <div class="pill">원반 <strong id="discCount">3</strong>개</div>
+            <div class="pill">이동 <strong id="moveCount">0</strong>회</div>
+            <div class="pill">시간 <strong id="timer">00:00.0</strong></div>
+          </div>
+          <div class="row">
+            <button class="btn secondary" id="btnReset">리셋</button>
+            <button class="btn secondary" id="btnQuit">처음으로</button>
+          </div>
+        </div>
+        <div class="board" id="board">
+          <div class="peg-area" id="pegArea">
+            <div class="peg" data-peg="0"><div class="stick"></div></div>
+            <div class="peg" data-peg="1"><div class="stick"></div></div>
+            <div class="peg" data-peg="2"><div class="stick"></div></div>
+          </div>
+          <div class="ground"></div>
+        </div>
+      </section>
+
+      <!-- STAGE CLEAR OVERLAY -->
+      <div class="overlay" id="stageOverlay" role="dialog" aria-modal="true">
+        <div class="modal">
+          <h2 id="stageResultTitle">스테이지 클리어!</h2>
+          <div class="grid">
+            <div class="pill">스테이지: <strong id="resStage">1</strong> / 6</div>
+            <div class="pill">원반: <strong id="resDiscs">3</strong>개</div>
+            <div class="pill">이동 횟수: <strong id="resMoves">0</strong>회</div>
+            <div class="pill">걸린 시간: <strong id="resTime">00:00.0</strong></div>
+          </div>
+          <div class="row" style="margin-top:14px; justify-content:flex-end">
+            <button class="btn secondary" id="btnOverlayReplay">리플레이</button>
+            <button class="btn" id="btnNextStage">다음 스테이지</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- FINAL OVERLAY -->
+      <div class="overlay" id="finalOverlay" role="dialog" aria-modal="true">
+        <div class="modal">
+          <h2>최종 결과</h2>
+          <p class="sub">지금까지 스테이지별로 걸린 시간과 이동 횟수입니다.</p>
+          <div id="summaryTableWrap"></div>
+          <div class="row" style="margin-top:14px; justify-content:flex-end">
+            <button class="btn" id="btnReplayAll">처음으로</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+<script>
+(function(){
+  const STAGE_MIN_DISCS = 3; // stage 1
+  const STAGE_MAX_DISCS = 8; // stage 6
+
+  // State
+  let stageIndex = 0; // 0..5 (maps to 3..8 discs)
+  let pegs = [[],[],[]]; // arrays of sizes on each peg (0=smallest)
+  let discCount = 3;
+  let moveCount = 0;
+  let selected = null; // {pegIndex, size}
+  let timerMs = 0;
+  let timerHandle = null;
+  let stageStats = []; // {stage:1..6, discs, moves, timeMs}
+
+  // Elements
+  const startScreen = document.getElementById('startScreen');
+  const gameWrap = document.getElementById('gameWrap');
+  const board = document.getElementById('board');
+  const pegArea = document.getElementById('pegArea');
+
+  const stageLabel = document.getElementById('stageLabel');
+  const discCountEl = document.getElementById('discCount');
+  const moveCountEl = document.getElementById('moveCount');
+  const timerEl = document.getElementById('timer');
+
+  const stageOverlay = document.getElementById('stageOverlay');
+  const stageResultTitle = document.getElementById('stageResultTitle');
+  const resStage = document.getElementById('resStage');
+  const resDiscs = document.getElementById('resDiscs');
+  const resMoves = document.getElementById('resMoves');
+  const resTime = document.getElementById('resTime');
+  const btnNextStage = document.getElementById('btnNextStage');
+  const btnOverlayReplay = document.getElementById('btnOverlayReplay');
+
+  const finalOverlay = document.getElementById('finalOverlay');
+  const summaryTableWrap = document.getElementById('summaryTableWrap');
+
+  // Buttons
+  document.getElementById('btnStart').addEventListener('click', startGame);
+  document.getElementById('btnReset').addEventListener('click', () => initStage(stageIndex));
+  document.getElementById('btnQuit').addEventListener('click', backToStart);
+  btnNextStage.addEventListener('click', nextStage);
+  btnOverlayReplay.addEventListener('click', () => {stageOverlay.style.display='none'; initStage(stageIndex)});
+  document.getElementById('btnReplayAll').addEventListener('click', backToStart);
+
+  // Init
+  renderPegs(); // create peg hit areas
+
+  // --- Core ---
+  function startGame(){
+    stageIndex = 0;
+    stageStats = [];
+    startScreen.style.display='none';
+    gameWrap.style.display='block';
+    initStage(stageIndex);
+  }
+  function backToStart(){
+    stopTimer();
+    stageOverlay.style.display='none';
+    finalOverlay.style.display='none';
+    gameWrap.style.display='none';
+    startScreen.style.display='block';
+  }
+  function nextStage(){
+    stageOverlay.style.display='none';
+    if(stageIndex >= (STAGE_MAX_DISCS - STAGE_MIN_DISCS)){
+      // finished all
+      showFinal();
+    } else {
+      stageIndex++;
+      initStage(stageIndex);
+    }
+  }
+
+  function initStage(idx){
+    // idx 0..5 => discs 3..8
+    discCount = STAGE_MIN_DISCS + idx;
+    pegs = [[],[],[]];
+    for(let s=discCount-1; s>=0; s--) pegs[0].push(s); // sizes: 0 small .. n-1 large
+    moveCount = 0; selected = null; timerMs = 0;
+
+    stageLabel.textContent = (idx+1);
+    discCountEl.textContent = discCount;
+    moveCountEl.textContent = 0;
+    timerEl.textContent = formatTime(0);
+
+    renderDiscs();
+    stopTimer();
+    timerHandle = setInterval(()=>{ timerMs+=100; timerEl.textContent = formatTime(timerMs); },100);
+  }
+
+  function stopTimer(){ if(timerHandle){ clearInterval(timerHandle); timerHandle=null; } }
+
+  function formatTime(ms){
+    const t = Math.floor(ms);
+    const totalSec = Math.floor(t/1000);
+    const m = Math.floor(totalSec/60).toString().padStart(2,'0');
+    const s = (totalSec%60).toString().padStart(2,'0');
+    const d = Math.floor((t%1000)/100);
+    return `${m}:${s}.${d}`;
+  }
+
+  // --- Rendering ---
+  function renderPegs(){
+    // add listeners to peg areas
+    pegArea.querySelectorAll('.peg').forEach(peg => {
+      peg.addEventListener('click', onPegClick);
+      peg.addEventListener('pointerdown', (e)=>{ /* allow touch */ });
+    });
+  }
+
+  function renderDiscs(){
+    // remove existing discs
+    board.querySelectorAll('.disc').forEach(d=>d.remove());
+
+    const pegEls = pegArea.querySelectorAll('.peg');
+    const area = pegArea.getBoundingClientRect();
+    const areaW = area.width; // used for width calc reference
+
+    // width scaling
+    const minW = Math.max(70, areaW/10);
+    const maxW = Math.max(160, areaW/4.7);
+
+    for(let p=0;p<3;p++){
+      const stack = pegs[p];
+      const pegEl = pegEls[p];
+
+      stack.forEach((size,indexFromBottom)=>{
+        const disc = document.createElement('div');
+        disc.className = 'disc';
+        disc.dataset.size = size;
+        disc.dataset.peg = p;
+        // width map 0..(n-1) => minW..maxW
+        const w = lerp(minW, maxW, size/(discCount-1 || 1));
+        disc.style.width = `${w}px`;
+        disc.style.left = `calc(50% - ${w/2}px)`;
+        const h = discHeight();
+        disc.style.bottom = `${12 + indexFromBottom*h}px`;
+        // color gradient per size
+        const hue = 180 + (size * (160/(Math.max(1,discCount-1))));
+        disc.style.background = `linear-gradient(90deg, hsl(${hue},85%,60%), hsl(${(hue+40)%360},85%,55%))`;
+        disc.style.boxShadow = 'inset 0 -4px 8px rgba(0,0,0,.25), 0 8px 24px rgba(0,0,0,.35)';
+        const lbl = document.createElement('div');
+        lbl.className='label';
+        lbl.textContent = size+1; // optional number label
+        disc.appendChild(lbl);
+
+        // top-of-peg rule: only top is clickable
+        const isTop = (size === stack[stack.length-1]);
+        if(!isTop){ disc.classList.add('locked'); }
+        else{
+          disc.addEventListener('click', onDiscClick);
+          disc.addEventListener('pointerdown', onDiscPointer);
+        }
+
+        pegEl.appendChild(disc);
+      });
+    }
+  }
+
+  function discHeight(){
+    return Math.max(26, Math.min(42, Math.round(board.clientHeight/22)));
+  }
+
+  function lerp(a,b,t){ return a + (b-a)*t }
+
+  // --- Interactions ---
+  function onDiscPointer(e){ /* placeholder to capture touch */ }
+
+  function onDiscClick(e){
+    const disc = e.currentTarget;
+    const size = Number(disc.dataset.size);
+    const pegIdx = Number(disc.dataset.peg);
+    // only if top
+    if(pegs[pegIdx][pegs[pegIdx].length-1] !== size) return;
+
+    if(selected && selected.size===size && selected.pegIndex===pegIdx){ // deselect
+      clearSelection(); return;
+    }
+    selectDisc(pegIdx, size, disc);
+  }
+
+  function selectDisc(pegIndex, size, discEl){
+    clearSelection();
+    selected = { pegIndex, size };
+    discEl.classList.add('selected');
+  }
+  function clearSelection(){
+    selected = null;
+    board.querySelectorAll('.disc.selected').forEach(d=>d.classList.remove('selected'));
+  }
+
+  function onPegClick(e){
+    const pegEl = e.currentTarget;
+    const targetPeg = Number(pegEl.dataset.peg);
+    if(!selected) return; // need a selected disc first
+    const { pegIndex, size } = selected;
+    if(pegIndex === targetPeg){ clearSelection(); return; }
+
+    // validate move: target top must be larger than size (number encodes size: bigger number = bigger actual disc)
+    const targetStack = pegs[targetPeg];
+    const top = targetStack[targetStack.length-1];
+    if(top !== undefined && top < size){ // smaller on top -> cannot place
+      flashPeg(pegEl);
+      return;
+    }
+
+    // perform animated move
+    doAnimatedMove(pegIndex, targetPeg, size).then(()=>{
+      moveCount++;
+      moveCountEl.textContent = moveCount;
+
+      // win check: all discs on last peg (peg 2) OR any peg that isn't start? Classic is moving to peg 2; we'll accept any non-0 peg with full stack
+      const done = (pegs[2].length === discCount) || (pegs[1].length === discCount);
+      if(done){
+        stopTimer();
+        stageStats.push({ stage: stageIndex+1, discs: discCount, moves: moveCount, timeMs: timerMs });
+        showStageClear();
+      } else {
+        // re-render to update clickable tops
+        renderDiscs();
+      }
+    });
+  }
+
+  function flashPeg(pegEl){
+    pegEl.animate([
+      { transform:'translateY(0)' },
+      { transform:'translateY(-6px)' },
+      { transform:'translateY(0)' }
+    ], { duration:220, easing:'ease-out' });
+  }
+
+  // --- Animation ---
+  async function doAnimatedMove(fromPeg, toPeg, size){
+    // Remove from state first? We'll keep logic safe: pop after animation completes to avoid temporarily double-top; we'll hide the real disc meanwhile
+    const fromPegEl = pegArea.querySelector(`.peg[data-peg="${fromPeg}"]`);
+    const toPegEl   = pegArea.querySelector(`.peg[data-peg="${toPeg}"]`);
+
+    const realDisc = [...fromPegEl.querySelectorAll('.disc')].find(d=>Number(d.dataset.size)===size);
+    if(!realDisc) return;
+
+    // Compute geometry
+    const boardRect = board.getBoundingClientRect();
+    const discRect = realDisc.getBoundingClientRect();
+    const toTopIndex = pegs[toPeg].length; // index after move (0 bottom)
+    const targetBottom = 12 + toTopIndex * discHeight();
+
+    // Create flying clone
+    const clone = realDisc.cloneNode(true);
+    clone.classList.remove('selected','locked');
+    clone.classList.add('flying');
+    clone.style.position='absolute';
+    clone.style.left = `${discRect.left - boardRect.left}px`;
+    clone.style.top  = `${discRect.top - boardRect.top}px`;
+    clone.style.width = `${discRect.width}px`;
+    clone.style.height = `${discRect.height}px`;
+    clone.style.transition = 'transform .25s ease, left .25s ease, top .25s ease';
+    board.appendChild(clone);
+
+    // Hide the real disc immediately (but keep DOM so stack heights remain), then after animation move it in DOM
+    realDisc.style.visibility='hidden';
+
+    const midY = board.clientHeight * 0.08; // rise to near top of area
+
+    // 1) lift up
+    await tweenTo(clone, { top: midY });
+    // 2) slide horizontally to target peg center
+    const toPegRect = toPegEl.getBoundingClientRect();
+    const targetX = (toPegRect.left - boardRect.left) + (toPegRect.width/2) - (discRect.width/2);
+    await tweenTo(clone, { left: targetX });
+    // 3) drop down to the stack height
+    const targetY = board.clientHeight - (document.querySelector('.ground').clientHeight) - targetBottom - discRect.height;
+    await tweenTo(clone, { top: targetY });
+
+    // Update state and DOM
+    pegs[fromPeg].pop();
+    pegs[toPeg].push(size);
+
+    clone.remove();
+    clearSelection();
+    renderDiscs();
+  }
+
+  function tweenTo(el, to){
+    return new Promise(resolve=>{
+      const start = el.getBoundingClientRect();
+      // convert to current left/top within board
+      const cs = getComputedStyle(el);
+      const curLeft = parseFloat(cs.left);
+      const curTop  = parseFloat(cs.top);
+      if(to.left !== undefined) el.style.left = `${to.left}px`;
+      if(to.top  !== undefined) el.style.top  = `${to.top}px`;
+      const onEnd = () => { el.removeEventListener('transitionend', onEnd); resolve(); };
+      el.addEventListener('transitionend', onEnd, { once:true });
+    });
+  }
+
+  // --- Overlays ---
+  function showStageClear(){
+    resStage.textContent = stageIndex+1;
+    resDiscs.textContent = discCount;
+    resMoves.textContent = moveCount;
+    resTime.textContent = formatTime(timerMs);
+
+    const final = (stageIndex >= (STAGE_MAX_DISCS - STAGE_MIN_DISCS));
+    stageResultTitle.textContent = final ? '모든 스테이지 완료!' : '스테이지 클리어!';
+    btnNextStage.textContent = final ? '최종 결과 보기' : '다음 스테이지';
+
+    stageOverlay.style.display='grid';
+  }
+
+  function showFinal(){
+    stageOverlay.style.display='none';
+    finalOverlay.style.display='grid';
+
+    // Build table
+    let html = '<table><thead><tr><th>Stage</th><th>Discs</th><th>Moves</th><th>Time</th></tr></thead><tbody>';
+    stageStats.forEach(s=>{
+      html += `<tr><td>${s.stage}</td><td>${s.discs}</td><td>${s.moves}</td><td>${formatTime(s.timeMs)}</td></tr>`;
+    });
+    html += '</tbody></table>';
+    summaryTableWrap.innerHTML = html;
+  }
+
+  // Close overlays when clicking background (optional)
+  [stageOverlay, finalOverlay].forEach(ov=>{
+    ov.addEventListener('click', (e)=>{ if(e.target===ov) ov.style.display='none'; });
+  });
+
+})();
+</script>
+</body>
+</html>
