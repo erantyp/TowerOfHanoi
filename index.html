@@ -35,7 +35,7 @@
     .disc.locked{pointer-events:none;filter:grayscale(.6) brightness(.9) opacity(.9)}
     .disc.selected{transform:translateY(-14px) scale(1.02);box-shadow:0 16px 40px rgba(34,211,238,.35)}
 
-    .overlay{position:fixed;inset:0;display:none;place-items:center;background:rgba(2,6,23,.6);backdrop-filter:blur(6px)}
+    .overlay{position:fixed;inset:0;display:none;place-items:center;background:rgba(2,6,23,.6);backdrop-filter:blur(6px);z-index:2000}
     .modal{width:min(680px,92vw);background:linear-gradient(180deg,rgba(255,255,255,.09),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.12);border-radius:18px;padding:20px}
     .modal h2{margin:0 0 8px;font-size:28px}
     .modal .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -115,26 +115,25 @@
   var STAGE_MAX_DISCS = 8; // stage 6
 
   // State
-  var stageIndex = 0; // 0..5 (maps to 3..8 discs)
-  var pegs = [[],[],[]]; // arrays of sizes on each peg (0=smallest)
+  var stageIndex = 0; // 0..5
+  var pegs = [[],[],[]]; // size indexes; 0 small
   var discCount = 3;
   var moveCount = 0;
   var selected = null; // {pegIndex, size}
   var timerMs = 0;
   var timerHandle = null;
   var stageStats = []; // {stage, discs, moves, timeMs}
+  var colorMap = [];   // fixed gradient per size per stage
 
   // Elements
   var startScreen = document.getElementById('startScreen');
   var gameWrap = document.getElementById('gameWrap');
   var board = document.getElementById('board');
   var pegArea = document.getElementById('pegArea');
-
   var stageLabel = document.getElementById('stageLabel');
   var discCountEl = document.getElementById('discCount');
   var moveCountEl = document.getElementById('moveCount');
   var timerEl = document.getElementById('timer');
-
   var stageOverlay = document.getElementById('stageOverlay');
   var stageResultTitle = document.getElementById('stageResultTitle');
   var resStage = document.getElementById('resStage');
@@ -182,10 +181,18 @@
   }
 
   function initStage(idx){
-    discCount = STAGE_MIN_DISCS + idx; // idx 0..5 => 3..8
+    discCount = STAGE_MIN_DISCS + idx;
     pegs = [[],[],[]];
-    for(var s=discCount-1; s>=0; s--) pegs[0].push(s); // 0 small .. n-1 large
+    for(var s=discCount-1; s>=0; s--) pegs[0].push(s); // [big,...,small]
     moveCount = 0; selected = null; timerMs = 0;
+
+    // fixed color map for this stage
+    colorMap = [];
+    for(var k=0;k<discCount;k++){
+      var hue = Math.round(200 + (k * (120/Math.max(1,discCount-1))));
+      var hue2 = (hue + 36) % 360;
+      colorMap[k] = 'linear-gradient(90deg, hsl('+hue+',85%,60%), hsl('+hue2+',85%,55%))';
+    }
 
     stageLabel.textContent = (idx+1);
     discCountEl.textContent = discCount;
@@ -202,8 +209,7 @@
   function formatTime(ms){
     var t = Math.floor(ms);
     var totalSec = Math.floor(t/1000);
-    var m = String(Math.floor(totalSec/60));
-    if(m.length<2) m = '0'+m;
+    var m = String(Math.floor(totalSec/60)); if(m.length<2) m='0'+m;
     var s = String(totalSec%60); if(s.length<2) s='0'+s;
     var d = Math.floor((t%1000)/100);
     return m+":"+s+"."+d;
@@ -211,12 +217,11 @@
 
   function renderPegs(){
     var pegsEls = pegArea.querySelectorAll('.peg');
-    for(var i=0;i<pegsEls.length;i++){
-      pegsEls[i].addEventListener('click', onPegClick);
-    }
+    for(var i=0;i<pegsEls.length;i++) pegsEls[i].addEventListener('click', onPegClick);
   }
 
   function renderDiscs(){
+    // wipe
     var exist = board.querySelectorAll('.disc');
     for(var i=0;i<exist.length;i++) exist[i].remove();
 
@@ -240,8 +245,7 @@
         disc.style.left = 'calc(50% - '+(w/2)+'px)';
         var h = discHeight();
         disc.style.bottom = (12 + j*h)+'px';
-        var hue = 180 + (size * (160/(Math.max(1,discCount-1))));
-        disc.style.background = 'linear-gradient(90deg, hsl('+hue+',85%,60%), hsl('+( (hue+40)%360 )+',85%,55%))';
+        disc.style.background = colorMap[size];
         disc.style.boxShadow = 'inset 0 -4px 8px rgba(0,0,0,.25), 0 8px 24px rgba(0,0,0,.35)';
         var lbl = document.createElement('div');
         lbl.className='label';
@@ -250,10 +254,7 @@
 
         var isTop = (size === stack[stack.length-1]);
         if(!isTop){ disc.classList.add('locked'); }
-        else{
-          disc.style.cursor='pointer';
-          disc.addEventListener('click', onDiscClick);
-        }
+        else{ disc.style.cursor='pointer'; disc.addEventListener('click', onDiscClick); }
         pegEl.appendChild(disc);
       }
     }
@@ -345,12 +346,12 @@
       realDisc.style.visibility='hidden';
 
       var midY = board.clientHeight * 0.08;
-      tweenTo(clone, null, midY, null, function(){
+      tweenTo(clone, null, midY, function(){
         var toPegRect = toPegEl.getBoundingClientRect();
         var targetX = (toPegRect.left - boardRect.left) + (toPegRect.width/2) - (discRect.width/2);
-        tweenTo(clone, targetX, null, null, function(){
+        tweenTo(clone, targetX, null, function(){
           var targetY = board.clientHeight - document.querySelector('.ground').clientHeight - targetBottom - discRect.height;
-          tweenTo(clone, null, targetY, null, function(){
+          tweenTo(clone, null, targetY, function(){
             pegs[fromPeg].pop();
             pegs[toPeg].push(size);
             clone.remove();
@@ -363,13 +364,12 @@
     });
   }
 
-  function tweenTo(el, left, top, time, cb){
+  function tweenTo(el, left, top, cb){
     if(left!==null && left!==undefined) el.style.left = left+'px';
     if(top!==null && top!==undefined) el.style.top = top+'px';
     var called=false;
     var onEnd=function(){ if(called) return; called=true; el.removeEventListener('transitionend', onEnd); if(cb) cb(); };
     el.addEventListener('transitionend', onEnd, {once:true});
-    // Fallback in case transitionend doesn't fire
     setTimeout(onEnd, 300);
   }
 
