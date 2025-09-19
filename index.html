@@ -124,6 +124,7 @@
   var timerHandle = null;
   var stageStats = []; // {stage, discs, moves, timeMs}
   var colorMap = [];   // fixed gradient per size per stage
+  var cheatHeld = false; // backquote(`) held
 
   // Elements
   var startScreen = document.getElementById('startScreen');
@@ -155,6 +156,32 @@
 
   // Init
   renderPegs();
+
+  // ==== Developer Cheats ====
+  // Hold the backquote (`) key, then press ←/→ for stage move, or Enter for force clear
+  document.addEventListener('keydown', function(e){
+    if(e.key==='`' || e.code==='Backquote' || e.keyCode===192){ cheatHeld = true; }
+    if(!cheatHeld) return;
+    if(e.key==='ArrowRight' || e.code==='ArrowRight'){
+      e.preventDefault();
+      stageOverlay.style.display='none';
+      if(stageIndex >= (STAGE_MAX_DISCS - STAGE_MIN_DISCS)){
+        showFinal();
+      } else { stageIndex++; initStage(stageIndex); }
+    }
+    if(e.key==='ArrowLeft' || e.code==='ArrowLeft'){
+      e.preventDefault();
+      stageOverlay.style.display='none';
+      if(stageIndex>0){ stageIndex--; initStage(stageIndex); }
+    }
+    if(e.key==='Enter' || e.code==='Enter'){
+      e.preventDefault();
+      forceSuccess();
+    }
+  });
+  document.addEventListener('keyup', function(e){
+    if(e.key==='`' || e.code==='Backquote' || e.keyCode===192){ cheatHeld = false; }
+  });
 
   function startGame(){
     stageIndex = 0;
@@ -371,6 +398,14 @@
     var onEnd=function(){ if(called) return; called=true; el.removeEventListener('transitionend', onEnd); if(cb) cb(); };
     el.addEventListener('transitionend', onEnd, {once:true});
     setTimeout(onEnd, 300);
+  }
+
+  function forceSuccess(){
+    if(gameWrap.style.display!=='block') return;
+    stopTimer();
+    var exists=false; for(var i=0;i<stageStats.length;i++){ if(stageStats[i].stage===stageIndex+1){ exists=true; break; } }
+    if(!exists){ stageStats.push({ stage: stageIndex+1, discs: discCount, moves: moveCount, timeMs: timerMs }); }
+    showStageClear();
   }
 
   function showStageClear(){
