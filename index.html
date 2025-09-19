@@ -42,7 +42,8 @@
     .peg::before{content:""; position:absolute; bottom:0; width:78%; height:12px; background:rgba(203,213,225,.9); border-radius:999px; box-shadow:inset 0 0 0 2px rgba(15,23,42,.35)}
     .stick{position:absolute; bottom:12px; width:14px; height:78%; background:linear-gradient(180deg,#e5e7eb,#cbd5e1); border-radius:10px; box-shadow:inset 0 0 0 2px rgba(15,23,42,.25)}
 
-    .disc{position:absolute; height:34px; border-radius:999px; display:flex; align-items:center; justify-content:center; font-weight:800; text-shadow:0 1px 0 rgba(0,0,0,.3); user-select:none; touch-action:none; pointer-events:auto; transition: transform .12s ease}
+    .disc{position:absolute; height:34px; border-radius:999px; display:flex; align-items:center; justify-content:center; font-weight:800; text-shadow:0 1px 0 rgba(0,0,0,.3); user-select:none; touch-action:none; pointer-events:auto; transition: transform .12s ease; z-index:10} 
+    .disc.top{cursor:pointer}
     .disc .label{font-size:12px; opacity:.9}
     .disc.locked{pointer-events:none; filter:grayscale(.6) brightness(.9) opacity(.9)}
     .disc.selected{transform: translateY(-14px) scale(1.02); box-shadow: 0 16px 40px rgba(34,211,238,.35)}
@@ -287,6 +288,7 @@
         const isTop = (size === stack[stack.length-1]);
         if(!isTop){ disc.classList.add('locked'); }
         else{
+          disc.classList.add('top');
           disc.addEventListener('click', onDiscClick);
           disc.addEventListener('pointerdown', onDiscPointer);
         }
@@ -331,8 +333,41 @@
   function onPegClick(e){
     const pegEl = e.currentTarget;
     const targetPeg = Number(pegEl.dataset.peg);
-    if(!selected) return; // need a selected disc first
+
+    // If nothing selected yet, auto-select the top disc of this peg (UX improvement for PC)
+    if(!selected){
+      const stack = pegs[targetPeg];
+      if(stack.length===0) return; // nothing to select
+      const topSize = stack[stack.length-1];
+      const topDisc = pegEl.querySelector(`.disc[data-size="${topSize}"]`);
+      if(topDisc){ selectDisc(targetPeg, topSize, topDisc); }
+      return;
+    }
+
     const { pegIndex, size } = selected;
+    if(pegIndex === targetPeg){ clearSelection(); return; }
+
+    // validate move: target top must be larger than size
+    const targetStack = pegs[targetPeg];
+    const top = targetStack[targetStack.length-1];
+    if(top !== undefined && top < size){
+      flashPeg(pegEl);
+      return;
+    }
+
+    doAnimatedMove(pegIndex, targetPeg, size).then(()=>{
+      moveCount++;
+      moveCountEl.textContent = moveCount;
+      const done = (pegs[2].length === discCount) || (pegs[1].length === discCount);
+      if(done){
+        stopTimer();
+        stageStats.push({ stage: stageIndex+1, discs: discCount, moves: moveCount, timeMs: timerMs });
+        showStageClear();
+      } else {
+        renderDiscs();
+      }
+    });
+  } = selected;
     if(pegIndex === targetPeg){ clearSelection(); return; }
 
     // validate move: target top must be larger than size (number encodes size: bigger number = bigger actual disc)
