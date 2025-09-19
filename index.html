@@ -158,9 +158,9 @@
   renderPegs();
 
   // ==== Developer Cheats ====
-  // Hold the backquote (`) key, then press ←/→ for stage move, or Enter for force clear
+  // Hold the backslash (\) key, then press ←/→ for stage move, or Enter for force clear
   document.addEventListener('keydown', function(e){
-    if(e.key==='`' || e.code==='Backquote' || e.keyCode===192){ cheatHeld = true; }
+    if(e.key==='\' || e.key==='￦' || e.code==='Backslash' || e.keyCode===220){ cheatHeld = true; }
     if(!cheatHeld) return;
     if(e.key==='ArrowRight' || e.code==='ArrowRight'){
       e.preventDefault();
@@ -180,7 +180,7 @@
     }
   });
   document.addEventListener('keyup', function(e){
-    if(e.key==='`' || e.code==='Backquote' || e.keyCode===192){ cheatHeld = false; }
+    if(e.key==='\' || e.key==='￦' || e.code==='Backslash' || e.keyCode===220){ cheatHeld = false; }
   });
 
   function startGame(){
