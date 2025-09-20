@@ -8,7 +8,7 @@
   :root{
     --fg:#e5e7eb; --muted:#94a3b8; --bg: radial-gradient(1200px 800px at 20% -10%, #1f2937, #0b0c10);
     --card:#0b1220; --card-br:#1f2a44; --accent:#60a5fa; --accent2:#10b981;
-    --pole:#1f2937; --base:#0f172a; --disk:#60a5fa; --bad:#ef4444;
+    --pole:#1f2937; --base:#0f172a;
   }
   *{box-sizing:border-box}
   html,body{height:100%}
@@ -20,7 +20,6 @@
   button{background:#111827; border:1px solid #262b36; color:var(--fg); padding:8px 12px; border-radius:10px; cursor:pointer; font-weight:700; transition:.15s transform,.15s opacity}
   button:hover{transform:translateY(-1px)}
   button[disabled]{opacity:.5; cursor:not-allowed}
-  select,input{background:#0b1220; color:var(--fg); border:1px solid #1f2a44; border-radius:8px; padding:6px 10px}
 
   .board{position:relative; background:var(--card); border:1px solid var(--card-br); border-radius:18px; padding:18px; box-shadow:0 10px 40px #0006}
   .stage{display:grid; grid-template-columns:repeat(3,1fr); gap:16px; align-items:end; min-height:360px}
@@ -33,11 +32,13 @@
   .disk[data-sel="1"]{outline:3px solid var(--accent2)}
 
   .legend{margin-top:10px; color:var(--muted); font-size:14px}
+  .pill{padding:6px 10px; border-radius:999px; background:#0b1220; border:1px solid #233047}
+
   .toast{position:fixed; right:16px; bottom:16px; background:#0b1220; border:1px solid #1f2a44; padding:10px 12px; border-radius:10px; font-size:14px; opacity:0; transform:translateY(8px); transition:.2s}
   .toast.show{opacity:1; transform:translateY(0)}
 
-  .overlay{position:fixed; inset:0; background: radial-gradient(1000px 700px at 30% -10%, #18212f, #090b0f); display:flex; align-items:center; justify-content:center; z-index:10000; pointer-events:auto}
-  .overlay[hidden]{display:none}
+  .overlay{position:fixed; inset:0; background: radial-gradient(1000px 700px at 30% -10%, #18212f, #090b0f); display:none; align-items:center; justify-content:center; z-index:10000; pointer-events:auto}
+  .overlay.show{display:flex}
   .card{background:var(--card); border:1px solid var(--card-br); border-radius:16px; padding:22px; width:min(92vw,560px); text-align:center}
   .card h1{margin:0 0 10px}
 </style>
@@ -45,21 +46,13 @@
 <body>
   <div class="app">
     <div class="topbar">
-      <div class="title">🗼 하노이의 탑</div>
+      <div class="title">🗼 하노이의 탑 <span class="pill" id="stageLabel">Stage 1 · 3개</span></div>
       <div class="controls">
-        <label>원반
-          <select id="selN">
-            <option>3</option>
-            <option selected>4</option>
-            <option>5</option>
-            <option>6</option>
-            <option>7</option>
-          </select>
-        </label>
         <button id="btnStartScreen">초기 화면</button>
         <button id="btnReset">리셋</button>
         <button id="btnUndo" disabled>되돌리기</button>
         <button id="btnSolve">자동해결</button>
+        <button id="btnNext" disabled>다음 스테이지 ▶</button>
       </div>
     </div>
 
@@ -75,18 +68,38 @@
 
   <div class="toast" id="toast">안내</div>
 
-  <!-- 시작 오버레이: 클릭 관통 방지 + 최상단 보장 -->
-  <div class="overlay" id="overlayStart">
+  <!-- 시작 오버레이 (스테이지 선택 제거, 순차 진행) -->
+  <div class="overlay show" id="overlayStart">
     <div class="card">
       <h1>하노이의 탑</h1>
-      <p>규칙: 한 번에 하나의 원반만 이동, 더 작은 원반만 더 큰 원반 위에 올릴 수 있습니다.</p>
+      <p>3개 → 7개까지 스테이지를 <b>순서대로</b> 클리어하세요.</p>
       <button id="btnStart" type="button">게임 시작</button>
+    </div>
+  </div>
+
+  <!-- 스테이지 클리어 오버레이 -->
+  <div class="overlay" id="overlayStageClear">
+    <div class="card">
+      <h1 id="stageClearTitle">스테이지 클리어!</h1>
+      <p id="stageClearDesc">다음 스테이지로 진행할 수 있어요.</p>
+      <button id="btnProceed" type="button">다음 스테이지 ▶</button>
+    </div>
+  </div>
+
+  <!-- 모든 스테이지 완료 오버레이 -->
+  <div class="overlay" id="overlayFinal">
+    <div class="card">
+      <h1>모든 스테이지 완료 🎉</h1>
+      <p>초기 화면으로 돌아가 다시 플레이할 수 있어요.</p>
+      <button id="btnFinalToStart" type="button">초기 화면으로</button>
     </div>
   </div>
 
 <script>
 (function(){
-  const selN = document.getElementById('selN');
+  const stages=[3,4,5,6,7];
+  let stageIndex=0; let N=stages[stageIndex];
+
   const stageEl = document.getElementById('stage');
   const pegs = [...stageEl.querySelectorAll('.peg')];
   const btnStart = document.getElementById('btnStart');
@@ -94,149 +107,101 @@
   const btnUndo = document.getElementById('btnUndo');
   const btnSolve = document.getElementById('btnSolve');
   const btnStartScreen = document.getElementById('btnStartScreen');
+  const btnNext = document.getElementById('btnNext');
   const overlayStart = document.getElementById('overlayStart');
+  const overlayStageClear = document.getElementById('overlayStageClear');
+  const overlayFinal = document.getElementById('overlayFinal');
+  const btnProceed = document.getElementById('btnProceed');
+  const btnFinalToStart = document.getElementById('btnFinalToStart');
+  const stageLabel = document.getElementById('stageLabel');
   const toast = document.getElementById('toast');
 
-  let N = +selN.value;
-  let stacks = [[],[],[]]; // 0=left,1=mid,2=right (bottom -> top)
-  let history = []; // for undo
-  let selectedPeg = null; // source index
-  let solving = false;
+  let stacks=[[],[],[]];
+  let history=[];
+  let selectedPeg=null;
+  let solving=false;
 
   const diskColors = ['#93c5fd','#60a5fa','#3b82f6','#2563eb','#1d4ed8','#10b981','#14b8a6'];
 
-  // --- Utils ---
   const showToast=(m)=>{ toast.textContent=m; toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'),1100); };
-  const idx=(i)=>Math.max(0,Math.min(2,i|0));
-  const canMove=(from,to)=>{
-    if(from===to) return false;
-    if(stacks[from].length===0) return false;
-    const disk = stacks[from][stacks[from].length-1];
-    const top = stacks[to][stacks[to].length-1];
-    return top===undefined || disk<top;
-  };
+  const canMove=(from,to)=>{ if(from===to) return false; if(stacks[from].length===0) return false; const disk=stacks[from][stacks[from].length-1]; const top=stacks[to][stacks[to].length-1]; return top===undefined || disk<top; };
+
+  function updateStageLabel(){ stageLabel.textContent=`Stage ${stageIndex+1} · ${N}개`; }
 
   function layout(){
-    // clear
-    pegs.forEach(peg=>{
-      peg.innerHTML = '<div class="pole"></div><div class="base"></div><div class="slot"></div>';
-    });
-    // render disks
-    const maxWidth = 260; // px
-    const minWidth = 70;  // px
+    pegs.forEach(peg=>{ peg.innerHTML = '<div class="pole"></div><div class="base"></div><div class="slot"></div>'; });
+    const maxWidth=260, minWidth=70, h=28;
     for(let i=0;i<3;i++){
-      const slot = pegs[i].querySelector('.slot');
-      const arr = stacks[i];
-      const h = 28; // disk height
+      const slot=pegs[i].querySelector('.slot');
+      const arr=stacks[i];
       arr.forEach((size, idxOnPeg)=>{
-        const d = document.createElement('div');
-        d.className='disk';
-        const frac = (size)/(N);
-        const w = Math.round(minWidth + (maxWidth-minWidth)*frac);
-        d.style.width = w+'px';
-        d.style.bottom = (60 + idxOnPeg*h)+'px';
-        d.style.background = diskColors[(size-1)%diskColors.length];
-        d.textContent = size;
-        d.dataset.size = size;
-        slot.appendChild(d);
+        const d=document.createElement('div'); d.className='disk';
+        const frac=size/N; const w=Math.round(minWidth+(maxWidth-minWidth)*frac);
+        d.style.width=w+'px'; d.style.bottom=(60+idxOnPeg*h)+'px';
+        d.style.background=diskColors[(size-1)%diskColors.length];
+        d.textContent=size; d.dataset.size=size; slot.appendChild(d);
       });
     }
     // selection outline
     pegs.forEach((peg,i)=>{
       const slot=peg.querySelector('.slot');
-      const topDisk = slot.querySelector('.disk:last-child');
+      const topDisk=slot.querySelector('.disk:last-child');
       slot.querySelectorAll('.disk').forEach(el=>el.dataset.sel='0');
       if(selectedPeg===i && topDisk){ topDisk.dataset.sel='1'; }
     });
     btnUndo.disabled = history.length===0;
+    btnNext.disabled = true; // 수동 next는 클리어 후만
   }
 
   function init(){
-    N = +selN.value;
-    stacks=[[],[],[]];
+    N=stages[stageIndex];
+    updateStageLabel();
+    stacks=[[],[],[]]; history=[]; selectedPeg=null; solving=false;
     for(let s=N; s>=1; s--) stacks[0].push(s);
-    history=[]; selectedPeg=null; solving=false;
     layout();
   }
 
   function move(from,to){
     if(!canMove(from,to)) { showToast('그 이동은 불가해요'); return false; }
-    const disk = stacks[from].pop();
-    stacks[to].push(disk);
-    history.push([from,to]);
-    selectedPeg=null;
-    layout();
-    checkWin();
-    return true;
+    const disk=stacks[from].pop(); stacks[to].push(disk); history.push([from,to]); selectedPeg=null; layout();
+    checkWin(); return true;
   }
 
-  function checkWin(){
-    if(stacks[2].length===N){
-      showToast('클리어! 🎉');
-    }
-  }
+  function checkWin(){ if(stacks[2].length===N){
+      document.getElementById('stageClearTitle').textContent=`Stage ${stageIndex+1} 클리어!`;
+      document.getElementById('stageClearDesc').textContent=(stageIndex<stages.length-1)?`다음은 ${stages[stageIndex+1]}개 스테이지입니다.`:'모든 스테이지를 완료했습니다!';
+      overlayStageClear.classList.add('show');
+      btnNext.disabled=false; // 상단 버튼도 활성화
+    } }
 
-  // Auto-solve using recursion (iterative stack) to avoid blocking UI
-  async function autoSolve(){
-    if(solving) return; solving=true; btnSolve.disabled=true;
-    const moves=[];
-    const solve=(n,from,aux,to)=>{
-      if(n===0) return;
-      solve(n-1,from,to,aux);
-      moves.push([from,to]);
-      solve(n-1,aux,from,to);
-    };
-    solve(N,0,1,2);
-    for(const [a,b] of moves){
-      if(!solving) break;
-      move(a,b);
-      await new Promise(r=>setTimeout(r, 150));
-    }
-    solving=false; btnSolve.disabled=false;
-  }
+  // 자동해결
+  async function autoSolve(){ if(solving) return; solving=true; btnSolve.disabled=true; const moves=[]; const solve=(n,from,aux,to)=>{ if(n===0) return; solve(n-1,from,to,aux); moves.push([from,to]); solve(n-1,aux,from,to); }; solve(N,0,1,2); for(const [a,b] of moves){ if(!solving) break; move(a,b); await new Promise(r=>setTimeout(r,120)); } solving=false; btnSolve.disabled=false; }
 
-  // --- Events ---
+  // 이벤트
   pegs.forEach(peg=>{
-    peg.addEventListener('click', (e)=>{
-      if(solving) return;
-      const i = +peg.dataset.i;
-      if(selectedPeg===null){
-        if(stacks[i].length===0){ showToast('이동할 원반이 없어요'); return; }
-        selectedPeg=i; layout();
-      }else{
-        if(i===selectedPeg){ selectedPeg=null; layout(); return; }
-        move(selectedPeg,i);
-      }
+    peg.addEventListener('click', ()=>{
+      if(solving) return; const i=+peg.dataset.i;
+      if(selectedPeg===null){ if(stacks[i].length===0){ showToast('이동할 원반이 없어요'); return; } selectedPeg=i; layout(); }
+      else{ if(i===selectedPeg){ selectedPeg=null; layout(); return; } move(selectedPeg,i); }
     }, {passive:true});
   });
 
-  btnUndo.addEventListener('click', ()=>{
-    if(history.length===0) return;
-    const [from,to] = history.pop();
-    const disk = stacks[to].pop();
-    stacks[from].push(disk);
-    selectedPeg=null; layout();
-  });
-
+  btnUndo.addEventListener('click', ()=>{ if(history.length===0) return; const [from,to]=history.pop(); const disk=stacks[to].pop(); stacks[from].push(disk); selectedPeg=null; layout(); });
   btnReset.addEventListener('click', ()=>{ init(); });
   btnSolve.addEventListener('click', ()=>{ autoSolve(); });
 
-  // 시작 오버레이: pointerdown + click 모두 전파 차단으로 클릭 관통 방지
+  // 오버레이 동작
   btnStart.addEventListener('pointerdown', (ev)=>{ ev.preventDefault(); ev.stopPropagation(); });
-  btnStart.addEventListener('click', (ev)=>{
-    ev.preventDefault(); ev.stopPropagation();
-    overlayStart.setAttribute('hidden','');
-    init();
-  });
+  btnStart.addEventListener('click', (ev)=>{ ev.preventDefault(); ev.stopPropagation(); overlayStart.classList.remove('show'); init(); });
+  btnStartScreen.addEventListener('click', ()=>{ overlayFinal.classList.remove('show'); overlayStageClear.classList.remove('show'); overlayStart.classList.add('show'); });
 
-  btnStartScreen.addEventListener('click', ()=>{
-    overlayStart.removeAttribute('hidden');
-  });
+  function goNextStage(){ if(stageIndex<stages.length-1){ stageIndex++; init(); overlayStageClear.classList.remove('show'); } else { overlayStageClear.classList.remove('show'); overlayFinal.classList.add('show'); } }
+  btnProceed.addEventListener('click', goNextStage);
+  btnNext.addEventListener('click', ()=>{ if(!btnNext.disabled) goNextStage(); });
+  btnFinalToStart.addEventListener('click', ()=>{ overlayFinal.classList.remove('show'); overlayStart.classList.add('show'); stageIndex=0; init(); });
 
-  selN.addEventListener('change', ()=>{ init(); });
-
-  // 첫 로드 시 오버레이 보이기 (게임 시작 전에는 보드 클릭 무시)
-  overlayStart.removeAttribute('hidden');
+  // 초기: 시작 오버레이 표시
+  overlayStart.classList.add('show');
 })();
 </script>
 </body>
