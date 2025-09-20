@@ -198,8 +198,24 @@
   btnSolve.addEventListener('click', ()=>{ autoSolve(); });
 
   // 오버레이 동작
-  btnStart.addEventListener('pointerdown', (ev)=>{ ev.preventDefault(); ev.stopPropagation(); });
-  btnStart.addEventListener('click', (ev)=>{ ev.preventDefault(); ev.stopPropagation(); overlayStart.classList.remove('show'); init(); });
+  // 일부 환경에서 pointerdown이 클릭 처리에 영향을 주는 사례가 있어 제거
+// btnStart.addEventListener('pointerdown', (ev)=>{ ev.preventDefault(); ev.stopPropagation(); }); ev.stopPropagation(); });
+  btnStart.addEventListener('click', (ev)=>{
+    ev.preventDefault(); ev.stopPropagation();
+    // 시작 시 다른 오버레이가 떠 있었다면 닫기
+    overlayStageClear.classList.remove('show');
+    overlayFinal.classList.remove('show');
+    overlayStart.classList.remove('show');
+    init();
+  });
+  // 모바일 탭 대응
+  btnStart.addEventListener('touchstart', (ev)=>{
+    ev.preventDefault(); ev.stopPropagation();
+    overlayStageClear.classList.remove('show');
+    overlayFinal.classList.remove('show');
+    overlayStart.classList.remove('show');
+    init();
+  }, {passive:false}); ev.stopPropagation(); overlayStart.classList.remove('show'); init(); });
   btnStartScreen.addEventListener('click', ()=>{ overlayFinal.classList.remove('show'); overlayStageClear.classList.remove('show'); overlayStart.classList.add('show'); });
 
   function goNextStage(){ if(stageIndex<stages.length-1){ stageIndex++; init(); overlayStageClear.classList.remove('show'); } else { overlayStageClear.classList.remove('show'); overlayFinal.classList.add('show'); } }
