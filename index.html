@@ -26,7 +26,7 @@
   .peg{position:relative; height:360px; background:linear-gradient(#0b1220,#0b1220) padding-box, conic-gradient(from 0deg, #1f2a44, #0e1726) border-box; border:1px solid #1f2a44; border-radius:14px; padding:16px}
   .pole{position:absolute; left:50%; transform:translateX(-50%); bottom:70px; width:12px; height:250px; background:var(--pole); border-radius:999px}
   .base{position:absolute; left:10%; right:10%; bottom:40px; height:18px; background:var(--base); border-radius:12px}
-  .slot{position:absolute; left:10%; right:10%; bottom:60px; height:0}
+  .slot{position:absolute; left:10%; right:10%; bottom:58px; height:0}
 
   .disk{position:absolute; height:28px; left:50%; transform:translateX(-50%); border-radius:10px; display:grid; place-items:center; color:#0b1220; font-weight:900; letter-spacing:.2px; text-shadow:none; border:1px solid #0f172a}
   .disk[data-sel="1"]{outline:3px solid var(--accent2)}
@@ -51,7 +51,7 @@
         <button id="btnStartScreen">초기 화면</button>
         <button id="btnReset">리셋</button>
         <button id="btnUndo" disabled>되돌리기</button>
-        <button id="btnSolve">자동해결</button>
+        <button id="btnSolve" style="display:none">자동해결</button>
         <button id="btnNext" disabled>다음 스테이지 ▶</button>
       </div>
     </div>
@@ -105,7 +105,7 @@
   const btnStart = document.getElementById('btnStart');
   const btnReset = document.getElementById('btnReset');
   const btnUndo = document.getElementById('btnUndo');
-  const btnSolve = document.getElementById('btnSolve');
+  const btnSolve = document.getElementById('btnSolve'); // hidden (keyboard cheat only)
   const btnStartScreen = document.getElementById('btnStartScreen');
   const btnNext = document.getElementById('btnNext');
   const overlayStart = document.getElementById('overlayStart');
@@ -137,7 +137,7 @@
       arr.forEach((size, idxOnPeg)=>{
         const d=document.createElement('div'); d.className='disk';
         const frac=size/N; const w=Math.round(minWidth+(maxWidth-minWidth)*frac);
-        d.style.width=w+'px'; d.style.bottom=(60+idxOnPeg*h)+'px';
+        d.style.width=w+'px'; d.style.bottom = (idxOnPeg*h)+'px';
         d.style.background=diskColors[(size-1)%diskColors.length];
         d.textContent=size; d.dataset.size=size; slot.appendChild(d);
       });
@@ -199,6 +199,18 @@
   btnProceed.addEventListener('click', goNextStage);
   btnNext.addEventListener('click', ()=>{ if(!btnNext.disabled) goNextStage(); });
   btnFinalToStart.addEventListener('click', ()=>{ overlayFinal.classList.remove('show'); overlayStart.classList.add('show'); stageIndex=0; init(); });
+
+  // 키보드 치트: ` (Backquote)로 암호화, Enter=자동해결, ←/→=스테이지 이동
+  let cheatArmed=false; let cheatTimer=null;
+  function armCheat(){ cheatArmed=true; clearTimeout(cheatTimer); cheatTimer=setTimeout(()=>cheatArmed=false,1500); }
+  function prevStage(){ if(stageIndex>0){ stageIndex--; overlayStageClear.classList.remove('show'); overlayFinal.classList.remove('show'); init(); } }
+  function nextStage(){ if(stageIndex<stages.length-1){ stageIndex++; overlayStageClear.classList.remove('show'); init(); } else { overlayFinal.classList.add('show'); } }
+  window.addEventListener('keydown', (e)=>{
+    if(e.code==='Backquote'){ armCheat(); }
+    else if(e.key==='Enter' && cheatArmed){ cheatArmed=false; clearTimeout(cheatTimer); autoSolve(); }
+    else if(e.key==='ArrowLeft' && cheatArmed){ cheatArmed=false; clearTimeout(cheatTimer); prevStage(); }
+    else if(e.key==='ArrowRight' && cheatArmed){ cheatArmed=false; clearTimeout(cheatTimer); nextStage(); }
+  }, {passive:true});
 
   // 초기: 시작 오버레이 표시
   overlayStart.classList.add('show');
