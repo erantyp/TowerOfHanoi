@@ -72,7 +72,7 @@
   <div class="overlay show" id="overlayStart">
     <div class="card">
       <h1>하노이의 탑</h1>
-      <p>3개 → 7개까지 스테이지를 <b>순서대로</b> 클리어하세요.</p>
+      <p>왼쪽 기둥(A)에서 <b>다른 어느 한 기둥(B 또는 C)</b>으로 모든 원반을 옮기면 클리어입니다. (3개 → 7개 순서 진행)</p>
       <button id="btnStart" type="button">게임 시작</button>
     </div>
   </div>
@@ -167,8 +167,15 @@
     checkWin(); return true;
   }
 
-  function checkWin(){ if(stacks[2].length===N){
+  function checkWin(){
+    // 성공 조건: 시작 기둥(0)이 아닌 어느 한 기둥(1 또는 2)에 모든 원반이 모이면 클리어
+    if(stacks[1].length===N || stacks[2].length===N){
       document.getElementById('stageClearTitle').textContent=`Stage ${stageIndex+1} 클리어!`;
+      document.getElementById('stageClearDesc').textContent=(stageIndex<stages.length-1)?`다음은 ${stages[stageIndex+1]}개 스테이지입니다.`:'모든 스테이지를 완료했습니다!';
+      overlayStageClear.classList.add('show');
+      btnNext.disabled=false; // 상단 버튼도 활성화
+    }
+  } 클리어!`;
       document.getElementById('stageClearDesc').textContent=(stageIndex<stages.length-1)?`다음은 ${stages[stageIndex+1]}개 스테이지입니다.`:'모든 스테이지를 완료했습니다!';
       overlayStageClear.classList.add('show');
       btnNext.disabled=false; // 상단 버튼도 활성화
