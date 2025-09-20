@@ -1,437 +1,242 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>하노이의 탑</title>
-  <style>
-    :root{--bg1:#0f172a;--accent:#22d3ee;--accent2:#a78bfa}
-    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-    html,body{height:100%;margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Pretendard,Apple SD Gothic Neo,Noto Sans KR;color:#e5e7eb;background: radial-gradient(1000px 600px at 50% 0%, #111827 0%, var(--bg1) 40%, #0b1220 100%);}    
-    .container{min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px}
-    .card{width:min(1100px,96vw);background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.02));backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.08);border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.35);padding:24px}
-    .title{font-size:clamp(28px,4vw,48px);font-weight:800;letter-spacing:-.02em;background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
-    .sub{opacity:.85;margin:0 0 16px}
-    .btn{cursor:pointer;display:inline-flex;align-items:center;gap:10px;border:none;border-radius:14px;padding:14px 20px;font-size:16px;font-weight:700;background:linear-gradient(90deg,var(--accent),var(--accent2));color:#0b1220;box-shadow:0 10px 30px rgba(34,211,238,.25);transition:transform .12s ease}
-    .btn:active{transform:translateY(1px)}
-    .btn.secondary{background:#111827;color:#e5e7eb;border:1px solid rgba(255,255,255,.1);box-shadow:none}
-    .row{display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>하노이의 탑</title>
+<style>
+  :root{
+    --fg:#e5e7eb; --muted:#94a3b8; --bg: radial-gradient(1200px 800px at 20% -10%, #1f2937, #0b0c10);
+    --card:#0b1220; --card-br:#1f2a44; --accent:#60a5fa; --accent2:#10b981;
+    --pole:#1f2937; --base:#0f172a; --disk:#60a5fa; --bad:#ef4444;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0; font-family: ui-sans-serif, system-ui, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", Segoe UI, Roboto, Helvetica, Arial; color:var(--fg); background:var(--bg); display:flex; align-items:center; justify-content:center; padding:20px}
+  .app{width:min(1100px,100%)}
+  .topbar{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px}
+  .title{font-weight:900; letter-spacing:.2px; font-size:clamp(18px,3vw,28px)}
+  .controls{display:flex; gap:8px; flex-wrap:wrap}
+  button{background:#111827; border:1px solid #262b36; color:var(--fg); padding:8px 12px; border-radius:10px; cursor:pointer; font-weight:700; transition:.15s transform,.15s opacity}
+  button:hover{transform:translateY(-1px)}
+  button[disabled]{opacity:.5; cursor:not-allowed}
+  select,input{background:#0b1220; color:var(--fg); border:1px solid #1f2a44; border-radius:8px; padding:6px 10px}
 
-    #gameWrap{display:none;margin-top:12px}
-    .hud{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:8px 0 16px}
-    .hud .stats{display:flex;gap:14px;flex-wrap:wrap}
-    .pill{border:1px solid rgba(255,255,255,.1);padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.04)}
-    .pill strong{color:#fff}
+  .board{position:relative; background:var(--card); border:1px solid var(--card-br); border-radius:18px; padding:18px; box-shadow:0 10px 40px #0006}
+  .stage{display:grid; grid-template-columns:repeat(3,1fr); gap:16px; align-items:end; min-height:360px}
+  .peg{position:relative; height:360px; background:linear-gradient(#0b1220,#0b1220) padding-box, conic-gradient(from 0deg, #1f2a44, #0e1726) border-box; border:1px solid #1f2a44; border-radius:14px; padding:16px}
+  .pole{position:absolute; left:50%; transform:translateX(-50%); bottom:70px; width:12px; height:250px; background:var(--pole); border-radius:999px}
+  .base{position:absolute; left:10%; right:10%; bottom:40px; height:18px; background:var(--base); border-radius:12px}
+  .slot{position:absolute; left:10%; right:10%; bottom:60px; height:0}
 
-    .board{position:relative;width:100%;aspect-ratio:16/8;min-height:420px;background:linear-gradient(180deg,#0f172a 0%,#0b1220 40%,#050a15 100%);border-radius:16px;border:1px solid rgba(255,255,255,.08);overflow:hidden}
-    .ground{position:absolute;left:0;right:0;bottom:0;height:22%;background:linear-gradient(180deg,rgba(34,211,238,.08),rgba(167,139,250,.06));border-top:1px solid rgba(255,255,255,.06)}
-    .peg-area{position:absolute;inset:8% 4% 22% 4%;display:grid;grid-template-columns:repeat(3,1fr);align-items:end;gap:2%}
-    .peg{position:relative;height:100%;display:flex;justify-content:center;align-items:flex-end;cursor:pointer}
-    .peg::before{content:"";position:absolute;bottom:0;width:78%;height:12px;background:rgba(203,213,225,.9);border-radius:999px;box-shadow:inset 0 0 0 2px rgba(15,23,42,.35)}
-    .stick{position:absolute;bottom:12px;width:14px;height:78%;background:linear-gradient(180deg,#e5e7eb,#cbd5e1);border-radius:10px;box-shadow:inset 0 0 0 2px rgba(15,23,42,.25)}
+  .disk{position:absolute; height:28px; left:50%; transform:translateX(-50%); border-radius:10px; display:grid; place-items:center; color:#0b1220; font-weight:900; letter-spacing:.2px; text-shadow:none; border:1px solid #0f172a}
+  .disk[data-sel="1"]{outline:3px solid var(--accent2)}
 
-    .disc{position:absolute;height:34px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-weight:800;text-shadow:0 1px 0 rgba(0,0,0,.3);user-select:none;touch-action:none;pointer-events:auto;transition:transform .12s ease;z-index:10}
-    .disc .label{font-size:12px;opacity:.9}
-    .disc.locked{pointer-events:none;filter:grayscale(.6) brightness(.9) opacity(.9)}
-    .disc.selected{transform:translateY(-14px) scale(1.02);box-shadow:0 16px 40px rgba(34,211,238,.35)}
+  .legend{margin-top:10px; color:var(--muted); font-size:14px}
+  .toast{position:fixed; right:16px; bottom:16px; background:#0b1220; border:1px solid #1f2a44; padding:10px 12px; border-radius:10px; font-size:14px; opacity:0; transform:translateY(8px); transition:.2s}
+  .toast.show{opacity:1; transform:translateY(0)}
 
-    .overlay{position:fixed;inset:0;display:none;place-items:center;background:rgba(2,6,23,.6);backdrop-filter:blur(6px);z-index:2000}
-    .modal{width:min(680px,92vw);background:linear-gradient(180deg,rgba(255,255,255,.09),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.12);border-radius:18px;padding:20px}
-    .modal h2{margin:0 0 8px;font-size:28px}
-    .modal .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-    table{width:100%;border-collapse:collapse;overflow:hidden;border-radius:12px}
-    th,td{padding:10px;border-bottom:1px solid rgba(255,255,255,.08);text-align:center}
-    th{background:rgba(255,255,255,.06)}
-
-    @media (max-width:760px){.board{aspect-ratio:3/4;min-height:520px}.disc{height:28px}.peg::before{height:10px}.stick{width:12px}}
-  </style>
+  .overlay{position:fixed; inset:0; background: radial-gradient(1000px 700px at 30% -10%, #18212f, #090b0f); display:flex; align-items:center; justify-content:center; z-index:10000; pointer-events:auto}
+  .overlay[hidden]{display:none}
+  .card{background:var(--card); border:1px solid var(--card-br); border-radius:16px; padding:22px; width:min(92vw,560px); text-align:center}
+  .card h1{margin:0 0 10px}
+</style>
 </head>
 <body>
-  <div class="container">
+  <div class="app">
+    <div class="topbar">
+      <div class="title">🗼 하노이의 탑</div>
+      <div class="controls">
+        <label>원반
+          <select id="selN">
+            <option>3</option>
+            <option selected>4</option>
+            <option>5</option>
+            <option>6</option>
+            <option>7</option>
+          </select>
+        </label>
+        <button id="btnStartScreen">초기 화면</button>
+        <button id="btnReset">리셋</button>
+        <button id="btnUndo" disabled>되돌리기</button>
+        <button id="btnSolve">자동해결</button>
+      </div>
+    </div>
+
+    <div class="board">
+      <div class="stage" id="stage">
+        <div class="peg" data-i="0" role="button" aria-label="기둥 A"></div>
+        <div class="peg" data-i="1" role="button" aria-label="기둥 B"></div>
+        <div class="peg" data-i="2" role="button" aria-label="기둥 C"></div>
+      </div>
+      <div class="legend">기둥을 클릭하여 원반을 옮기세요. (작은 원반이 큰 원반 위로만 가능)</div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">안내</div>
+
+  <!-- 시작 오버레이: 클릭 관통 방지 + 최상단 보장 -->
+  <div class="overlay" id="overlayStart">
     <div class="card">
-      <section id="startScreen">
-        <h1 class="title">하노이의 탑</h1>
-        <p class="sub">3개의 기둥과 서로 다른 크기의 원반들. 큰 원반은 작은 원반 위에 놓을 수 없습니다. 한 번에 하나만 옮기세요!</p>
-        <div class="row"><button class="btn" id="btnStart">게임 시작</button></div>
-      </section>
-
-      <section id="gameWrap">
-        <div class="hud">
-          <div class="stats">
-            <div class="pill">스테이지 <strong id="stageLabel">1</strong> / 6</div>
-            <div class="pill">원반 <strong id="discCount">3</strong>개</div>
-            <div class="pill">이동 <strong id="moveCount">0</strong>회</div>
-            <div class="pill">시간 <strong id="timer">00:00.0</strong></div>
-          </div>
-          <div class="row">
-            <button class="btn secondary" id="btnReset">리셋</button>
-            <button class="btn secondary" id="btnQuit">처음으로</button>
-          </div>
-        </div>
-        <div class="board" id="board">
-          <div class="peg-area" id="pegArea">
-            <div class="peg" data-peg="0"><div class="stick"></div></div>
-            <div class="peg" data-peg="1"><div class="stick"></div></div>
-            <div class="peg" data-peg="2"><div class="stick"></div></div>
-          </div>
-          <div class="ground"></div>
-        </div>
-      </section>
-
-      <div class="overlay" id="stageOverlay" role="dialog" aria-modal="true">
-        <div class="modal">
-          <h2 id="stageResultTitle">스테이지 클리어!</h2>
-          <div class="grid">
-            <div class="pill">스테이지: <strong id="resStage">1</strong> / 6</div>
-            <div class="pill">원반: <strong id="resDiscs">3</strong>개</div>
-            <div class="pill">이동 횟수: <strong id="resMoves">0</strong>회</div>
-            <div class="pill">걸린 시간: <strong id="resTime">00:00.0</strong></div>
-          </div>
-          <div class="row" style="margin-top:14px;justify-content:flex-end">
-            <button class="btn secondary" id="btnOverlayReplay">리플레이</button>
-            <button class="btn" id="btnNextStage">다음 스테이지</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="overlay" id="finalOverlay" role="dialog" aria-modal="true">
-        <div class="modal">
-          <h2>최종 결과</h2>
-          <p class="sub">지금까지 스테이지별로 걸린 시간과 이동 횟수입니다.</p>
-          <div id="summaryTableWrap"></div>
-          <div class="row" style="margin-top:14px;justify-content:flex-end">
-            <button class="btn" id="btnReplayAll">처음으로</button>
-          </div>
-        </div>
-      </div>
-
+      <h1>하노이의 탑</h1>
+      <p>규칙: 한 번에 하나의 원반만 이동, 더 작은 원반만 더 큰 원반 위에 올릴 수 있습니다.</p>
+      <button id="btnStart" type="button">게임 시작</button>
     </div>
   </div>
 
 <script>
 (function(){
-  'use strict';
-  var STAGE_MIN_DISCS = 3; // stage 1
-  var STAGE_MAX_DISCS = 8; // stage 6
+  const selN = document.getElementById('selN');
+  const stageEl = document.getElementById('stage');
+  const pegs = [...stageEl.querySelectorAll('.peg')];
+  const btnStart = document.getElementById('btnStart');
+  const btnReset = document.getElementById('btnReset');
+  const btnUndo = document.getElementById('btnUndo');
+  const btnSolve = document.getElementById('btnSolve');
+  const btnStartScreen = document.getElementById('btnStartScreen');
+  const overlayStart = document.getElementById('overlayStart');
+  const toast = document.getElementById('toast');
 
-  // State
-  var stageIndex = 0; // 0..5
-  var pegs = [[],[],[]]; // size indexes; 0 small
-  var discCount = 3;
-  var moveCount = 0;
-  var selected = null; // {pegIndex, size}
-  var timerMs = 0;
-  var timerHandle = null;
-  var stageStats = []; // {stage, discs, moves, timeMs}
-  var colorMap = [];   // fixed gradient per size per stage
-  var cheatHeld = false; // backquote(`) held
+  let N = +selN.value;
+  let stacks = [[],[],[]]; // 0=left,1=mid,2=right (bottom -> top)
+  let history = []; // for undo
+  let selectedPeg = null; // source index
+  let solving = false;
 
-  // Elements
-  var startScreen = document.getElementById('startScreen');
-  var gameWrap = document.getElementById('gameWrap');
-  var board = document.getElementById('board');
-  var pegArea = document.getElementById('pegArea');
-  var stageLabel = document.getElementById('stageLabel');
-  var discCountEl = document.getElementById('discCount');
-  var moveCountEl = document.getElementById('moveCount');
-  var timerEl = document.getElementById('timer');
-  var stageOverlay = document.getElementById('stageOverlay');
-  var stageResultTitle = document.getElementById('stageResultTitle');
-  var resStage = document.getElementById('resStage');
-  var resDiscs = document.getElementById('resDiscs');
-  var resMoves = document.getElementById('resMoves');
-  var resTime = document.getElementById('resTime');
-  var btnNextStage = document.getElementById('btnNextStage');
-  var btnOverlayReplay = document.getElementById('btnOverlayReplay');
-  var finalOverlay = document.getElementById('finalOverlay');
-  var summaryTableWrap = document.getElementById('summaryTableWrap');
+  const diskColors = ['#93c5fd','#60a5fa','#3b82f6','#2563eb','#1d4ed8','#10b981','#14b8a6'];
 
-  // Buttons
-  document.getElementById('btnStart').addEventListener('click', startGame);
-  document.getElementById('btnReset').addEventListener('click', function(){ initStage(stageIndex); });
-  document.getElementById('btnQuit').addEventListener('click', backToStart);
-  btnNextStage.addEventListener('click', nextStage);
-  btnOverlayReplay.addEventListener('click', function(){ stageOverlay.style.display='none'; initStage(stageIndex); });
-  document.getElementById('btnReplayAll').addEventListener('click', backToStart);
+  // --- Utils ---
+  const showToast=(m)=>{ toast.textContent=m; toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'),1100); };
+  const idx=(i)=>Math.max(0,Math.min(2,i|0));
+  const canMove=(from,to)=>{
+    if(from===to) return false;
+    if(stacks[from].length===0) return false;
+    const disk = stacks[from][stacks[from].length-1];
+    const top = stacks[to][stacks[to].length-1];
+    return top===undefined || disk<top;
+  };
 
-  // Init
-  renderPegs();
-
-  // ==== Developer Cheats ====
-  // Hold the backslash (\) key, then press ←/→ for stage move, or Enter for force clear
-  document.addEventListener('keydown', function(e){
-    if(e.key==='\' || e.key==='￦' || e.code==='Backslash' || e.keyCode===220){ cheatHeld = true; }
-    if(!cheatHeld) return;
-    if(e.key==='ArrowRight' || e.code==='ArrowRight'){
-      e.preventDefault();
-      stageOverlay.style.display='none';
-      if(stageIndex >= (STAGE_MAX_DISCS - STAGE_MIN_DISCS)){
-        showFinal();
-      } else { stageIndex++; initStage(stageIndex); }
-    }
-    if(e.key==='ArrowLeft' || e.code==='ArrowLeft'){
-      e.preventDefault();
-      stageOverlay.style.display='none';
-      if(stageIndex>0){ stageIndex--; initStage(stageIndex); }
-    }
-    if(e.key==='Enter' || e.code==='Enter'){
-      e.preventDefault();
-      forceSuccess();
-    }
-  });
-  document.addEventListener('keyup', function(e){
-    if(e.key==='\' || e.key==='￦' || e.code==='Backslash' || e.keyCode===220){ cheatHeld = false; }
-  });
-
-  function startGame(){
-    stageIndex = 0;
-    stageStats = [];
-    startScreen.style.display='none';
-    gameWrap.style.display='block';
-    initStage(stageIndex);
-  }
-  function backToStart(){
-    stopTimer();
-    stageOverlay.style.display='none';
-    finalOverlay.style.display='none';
-    gameWrap.style.display='none';
-    startScreen.style.display='block';
-  }
-  function nextStage(){
-    stageOverlay.style.display='none';
-    if(stageIndex >= (STAGE_MAX_DISCS - STAGE_MIN_DISCS)){
-      showFinal();
-    } else {
-      stageIndex++;
-      initStage(stageIndex);
-    }
-  }
-
-  function initStage(idx){
-    discCount = STAGE_MIN_DISCS + idx;
-    pegs = [[],[],[]];
-    for(var s=discCount-1; s>=0; s--) pegs[0].push(s); // [big,...,small]
-    moveCount = 0; selected = null; timerMs = 0;
-
-    // fixed color map for this stage
-    colorMap = [];
-    for(var k=0;k<discCount;k++){
-      var hue = Math.round(200 + (k * (120/Math.max(1,discCount-1))));
-      var hue2 = (hue + 36) % 360;
-      colorMap[k] = 'linear-gradient(90deg, hsl('+hue+',85%,60%), hsl('+hue2+',85%,55%))';
-    }
-
-    stageLabel.textContent = (idx+1);
-    discCountEl.textContent = discCount;
-    moveCountEl.textContent = 0;
-    timerEl.textContent = formatTime(0);
-
-    renderDiscs();
-    stopTimer();
-    timerHandle = setInterval(function(){ timerMs+=100; timerEl.textContent = formatTime(timerMs); },100);
-  }
-
-  function stopTimer(){ if(timerHandle){ clearInterval(timerHandle); timerHandle=null; } }
-
-  function formatTime(ms){
-    var t = Math.floor(ms);
-    var totalSec = Math.floor(t/1000);
-    var m = String(Math.floor(totalSec/60)); if(m.length<2) m='0'+m;
-    var s = String(totalSec%60); if(s.length<2) s='0'+s;
-    var d = Math.floor((t%1000)/100);
-    return m+":"+s+"."+d;
-  }
-
-  function renderPegs(){
-    var pegsEls = pegArea.querySelectorAll('.peg');
-    for(var i=0;i<pegsEls.length;i++) pegsEls[i].addEventListener('click', onPegClick);
-  }
-
-  function renderDiscs(){
-    // wipe
-    var exist = board.querySelectorAll('.disc');
-    for(var i=0;i<exist.length;i++) exist[i].remove();
-
-    var pegEls = pegArea.querySelectorAll('.peg');
-    var area = pegArea.getBoundingClientRect();
-    var areaW = area.width;
-    var minW = Math.max(70, areaW/10);
-    var maxW = Math.max(160, areaW/4.7);
-
-    for(var p=0;p<3;p++){
-      var stack = pegs[p];
-      var pegEl = pegEls[p];
-      for(var j=0;j<stack.length;j++){
-        var size = stack[j];
-        var disc = document.createElement('div');
-        disc.className = 'disc';
-        disc.setAttribute('data-size', String(size));
-        disc.setAttribute('data-peg', String(p));
-        var w = lerp(minW, maxW, (discCount<=1?0:size/(discCount-1)));
-        disc.style.width = w+'px';
-        disc.style.left = 'calc(50% - '+(w/2)+'px)';
-        var h = discHeight();
-        disc.style.bottom = (12 + j*h)+'px';
-        disc.style.background = colorMap[size];
-        disc.style.boxShadow = 'inset 0 -4px 8px rgba(0,0,0,.25), 0 8px 24px rgba(0,0,0,.35)';
-        var lbl = document.createElement('div');
-        lbl.className='label';
-        lbl.textContent = (size+1);
-        disc.appendChild(lbl);
-
-        var isTop = (size === stack[stack.length-1]);
-        if(!isTop){ disc.classList.add('locked'); }
-        else{ disc.style.cursor='pointer'; disc.addEventListener('click', onDiscClick); }
-        pegEl.appendChild(disc);
-      }
-    }
-  }
-
-  function discHeight(){ return Math.max(26, Math.min(42, Math.round(board.clientHeight/22))); }
-  function lerp(a,b,t){ return a + (b-a)*t; }
-
-  function onDiscClick(e){
-    var disc = e.currentTarget;
-    var size = Number(disc.getAttribute('data-size'));
-    var pegIdx = Number(disc.getAttribute('data-peg'));
-    if(pegs[pegIdx][pegs[pegIdx].length-1] !== size) return;
-    if(selected && selected.size===size && selected.pegIndex===pegIdx){ clearSelection(); return; }
-    selectDisc(pegIdx, size, disc);
-  }
-
-  function selectDisc(pegIndex, size, discEl){
-    clearSelection();
-    selected = { pegIndex: pegIndex, size: size };
-    discEl.classList.add('selected');
-  }
-  function clearSelection(){
-    selected = null;
-    var sel = board.querySelectorAll('.disc.selected');
-    for(var i=0;i<sel.length;i++) sel[i].classList.remove('selected');
-  }
-
-  function onPegClick(e){
-    var pegEl = e.currentTarget;
-    var targetPeg = Number(pegEl.getAttribute('data-peg'));
-
-    if(!selected){ // 첫 클릭: 해당 기둥의 top 자동 선택
-      var stack = pegs[targetPeg];
-      if(stack.length===0) return;
-      var topSize = stack[stack.length-1];
-      var topDisc = pegEl.querySelector('.disc[data-size="'+topSize+'"]');
-      if(topDisc){ selectDisc(targetPeg, topSize, topDisc); }
-      return;
-    }
-
-    var pegIndex = selected.pegIndex; var size = selected.size;
-    if(pegIndex === targetPeg){ clearSelection(); return; }
-
-    var targetStack = pegs[targetPeg];
-    var top = targetStack[targetStack.length-1];
-    if(top !== undefined && top < size){ flashPeg(pegEl); return; }
-
-    doAnimatedMove(pegIndex, targetPeg, size).then(function(){
-      moveCount++; moveCountEl.textContent = moveCount;
-      var done = (pegs[2].length === discCount) || (pegs[1].length === discCount);
-      if(done){
-        stopTimer();
-        stageStats.push({ stage: stageIndex+1, discs: discCount, moves: moveCount, timeMs: timerMs });
-        showStageClear();
-      } else {
-        renderDiscs();
-      }
+  function layout(){
+    // clear
+    pegs.forEach(peg=>{
+      peg.innerHTML = '<div class="pole"></div><div class="base"></div><div class="slot"></div>';
     });
-  }
-
-  function flashPeg(pegEl){
-    pegEl.animate([{transform:'translateY(0)'},{transform:'translateY(-6px)'},{transform:'translateY(0)'}],{duration:220,easing:'ease-out'});
-  }
-
-  function doAnimatedMove(fromPeg, toPeg, size){
-    return new Promise(function(resolve){
-      var fromPegEl = pegArea.querySelector('.peg[data-peg="'+fromPeg+'"]');
-      var toPegEl   = pegArea.querySelector('.peg[data-peg="'+toPeg+'"]');
-      var realDisc = null;
-      var discs = fromPegEl.querySelectorAll('.disc');
-      for(var i=0;i<discs.length;i++){ if(Number(discs[i].getAttribute('data-size'))===size){ realDisc=discs[i]; break; } }
-      if(!realDisc){ resolve(); return; }
-
-      var boardRect = board.getBoundingClientRect();
-      var discRect = realDisc.getBoundingClientRect();
-      var toTopIndex = pegs[toPeg].length;
-      var targetBottom = 12 + toTopIndex * discHeight();
-
-      var clone = realDisc.cloneNode(true);
-      clone.classList.remove('selected','locked');
-      clone.style.position='absolute';
-      clone.style.left = (discRect.left - boardRect.left)+'px';
-      clone.style.top  = (discRect.top  - boardRect.top)+'px';
-      clone.style.width = discRect.width+'px';
-      clone.style.height = discRect.height+'px';
-      clone.style.transition = 'left .25s ease, top .25s ease';
-      board.appendChild(clone);
-      realDisc.style.visibility='hidden';
-
-      var midY = board.clientHeight * 0.08;
-      tweenTo(clone, null, midY, function(){
-        var toPegRect = toPegEl.getBoundingClientRect();
-        var targetX = (toPegRect.left - boardRect.left) + (toPegRect.width/2) - (discRect.width/2);
-        tweenTo(clone, targetX, null, function(){
-          var targetY = board.clientHeight - document.querySelector('.ground').clientHeight - targetBottom - discRect.height;
-          tweenTo(clone, null, targetY, function(){
-            pegs[fromPeg].pop();
-            pegs[toPeg].push(size);
-            clone.remove();
-            clearSelection();
-            renderDiscs();
-            resolve();
-          });
-        });
+    // render disks
+    const maxWidth = 260; // px
+    const minWidth = 70;  // px
+    for(let i=0;i<3;i++){
+      const slot = pegs[i].querySelector('.slot');
+      const arr = stacks[i];
+      const h = 28; // disk height
+      arr.forEach((size, idxOnPeg)=>{
+        const d = document.createElement('div');
+        d.className='disk';
+        const frac = (size)/(N);
+        const w = Math.round(minWidth + (maxWidth-minWidth)*frac);
+        d.style.width = w+'px';
+        d.style.bottom = (60 + idxOnPeg*h)+'px';
+        d.style.background = diskColors[(size-1)%diskColors.length];
+        d.textContent = size;
+        d.dataset.size = size;
+        slot.appendChild(d);
       });
-    });
-  }
-
-  function tweenTo(el, left, top, cb){
-    if(left!==null && left!==undefined) el.style.left = left+'px';
-    if(top!==null && top!==undefined) el.style.top = top+'px';
-    var called=false;
-    var onEnd=function(){ if(called) return; called=true; el.removeEventListener('transitionend', onEnd); if(cb) cb(); };
-    el.addEventListener('transitionend', onEnd, {once:true});
-    setTimeout(onEnd, 300);
-  }
-
-  function forceSuccess(){
-    if(gameWrap.style.display!=='block') return;
-    stopTimer();
-    var exists=false; for(var i=0;i<stageStats.length;i++){ if(stageStats[i].stage===stageIndex+1){ exists=true; break; } }
-    if(!exists){ stageStats.push({ stage: stageIndex+1, discs: discCount, moves: moveCount, timeMs: timerMs }); }
-    showStageClear();
-  }
-
-  function showStageClear(){
-    resStage.textContent = (stageIndex+1);
-    resDiscs.textContent = discCount;
-    resMoves.textContent = moveCount;
-    resTime.textContent = formatTime(timerMs);
-    var final = (stageIndex >= (STAGE_MAX_DISCS - STAGE_MIN_DISCS));
-    stageResultTitle.textContent = final ? '모든 스테이지 완료!' : '스테이지 클리어!';
-    btnNextStage.textContent = final ? '최종 결과 보기' : '다음 스테이지';
-    stageOverlay.style.display='grid';
-  }
-
-  function showFinal(){
-    stageOverlay.style.display='none';
-    finalOverlay.style.display='grid';
-    var html = '<table><thead><tr><th>Stage</th><th>Discs</th><th>Moves</th><th>Time</th></tr></thead><tbody>';
-    for(var i=0;i<stageStats.length;i++){
-      var s = stageStats[i];
-      html += '<tr><td>'+s.stage+'</td><td>'+s.discs+'</td><td>'+s.moves+'</td><td>'+formatTime(s.timeMs)+'</td></tr>';
     }
-    html += '</tbody></table>';
-    summaryTableWrap.innerHTML = html;
+    // selection outline
+    pegs.forEach((peg,i)=>{
+      const slot=peg.querySelector('.slot');
+      const topDisk = slot.querySelector('.disk:last-child');
+      slot.querySelectorAll('.disk').forEach(el=>el.dataset.sel='0');
+      if(selectedPeg===i && topDisk){ topDisk.dataset.sel='1'; }
+    });
+    btnUndo.disabled = history.length===0;
   }
 
-  [stageOverlay, finalOverlay].forEach(function(ov){ ov.addEventListener('click', function(e){ if(e.target===ov) ov.style.display='none'; }); });
+  function init(){
+    N = +selN.value;
+    stacks=[[],[],[]];
+    for(let s=N; s>=1; s--) stacks[0].push(s);
+    history=[]; selectedPeg=null; solving=false;
+    layout();
+  }
+
+  function move(from,to){
+    if(!canMove(from,to)) { showToast('그 이동은 불가해요'); return false; }
+    const disk = stacks[from].pop();
+    stacks[to].push(disk);
+    history.push([from,to]);
+    selectedPeg=null;
+    layout();
+    checkWin();
+    return true;
+  }
+
+  function checkWin(){
+    if(stacks[2].length===N){
+      showToast('클리어! 🎉');
+    }
+  }
+
+  // Auto-solve using recursion (iterative stack) to avoid blocking UI
+  async function autoSolve(){
+    if(solving) return; solving=true; btnSolve.disabled=true;
+    const moves=[];
+    const solve=(n,from,aux,to)=>{
+      if(n===0) return;
+      solve(n-1,from,to,aux);
+      moves.push([from,to]);
+      solve(n-1,aux,from,to);
+    };
+    solve(N,0,1,2);
+    for(const [a,b] of moves){
+      if(!solving) break;
+      move(a,b);
+      await new Promise(r=>setTimeout(r, 150));
+    }
+    solving=false; btnSolve.disabled=false;
+  }
+
+  // --- Events ---
+  pegs.forEach(peg=>{
+    peg.addEventListener('click', (e)=>{
+      if(solving) return;
+      const i = +peg.dataset.i;
+      if(selectedPeg===null){
+        if(stacks[i].length===0){ showToast('이동할 원반이 없어요'); return; }
+        selectedPeg=i; layout();
+      }else{
+        if(i===selectedPeg){ selectedPeg=null; layout(); return; }
+        move(selectedPeg,i);
+      }
+    }, {passive:true});
+  });
+
+  btnUndo.addEventListener('click', ()=>{
+    if(history.length===0) return;
+    const [from,to] = history.pop();
+    const disk = stacks[to].pop();
+    stacks[from].push(disk);
+    selectedPeg=null; layout();
+  });
+
+  btnReset.addEventListener('click', ()=>{ init(); });
+  btnSolve.addEventListener('click', ()=>{ autoSolve(); });
+
+  // 시작 오버레이: pointerdown + click 모두 전파 차단으로 클릭 관통 방지
+  btnStart.addEventListener('pointerdown', (ev)=>{ ev.preventDefault(); ev.stopPropagation(); });
+  btnStart.addEventListener('click', (ev)=>{
+    ev.preventDefault(); ev.stopPropagation();
+    overlayStart.setAttribute('hidden','');
+    init();
+  });
+
+  btnStartScreen.addEventListener('click', ()=>{
+    overlayStart.removeAttribute('hidden');
+  });
+
+  selN.addEventListener('change', ()=>{ init(); });
+
+  // 첫 로드 시 오버레이 보이기 (게임 시작 전에는 보드 클릭 무시)
+  overlayStart.removeAttribute('hidden');
 })();
 </script>
 </body>
