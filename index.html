@@ -68,7 +68,7 @@
 
   <div class="toast" id="toast">안내</div>
 
-  <!-- 시작 오버레이 (스테이지 선택 제거, 순차 진행) -->
+  <!-- 시작 오버레이 -->
   <div class="overlay show" id="overlayStart">
     <div class="card">
       <h1>하노이의 탑</h1>
@@ -105,7 +105,7 @@
   const btnStart = document.getElementById('btnStart');
   const btnReset = document.getElementById('btnReset');
   const btnUndo = document.getElementById('btnUndo');
-  const btnSolve = document.getElementById('btnSolve'); // hidden (keyboard cheat only)
+  const btnSolve = document.getElementById('btnSolve'); // hidden
   const btnStartScreen = document.getElementById('btnStartScreen');
   const btnNext = document.getElementById('btnNext');
   const overlayStart = document.getElementById('overlayStart');
@@ -175,39 +175,61 @@
       overlayStageClear.classList.add('show');
       btnNext.disabled=false; // 상단 버튼도 활성화
     }
-  } 클리어!`;
-      document.getElementById('stageClearDesc').textContent=(stageIndex<stages.length-1)?`다음은 ${stages[stageIndex+1]}개 스테이지입니다.`:'모든 스테이지를 완료했습니다!';
-      overlayStageClear.classList.add('show');
-      btnNext.disabled=false; // 상단 버튼도 활성화
-    } }
+  }
 
   // 자동해결
-  async function autoSolve(){ if(solving) return; solving=true; btnSolve.disabled=true; const moves=[]; const solve=(n,from,aux,to)=>{ if(n===0) return; solve(n-1,from,to,aux); moves.push([from,to]); solve(n-1,aux,from,to); }; solve(N,0,1,2); for(const [a,b] of moves){ if(!solving) break; move(a,b); await new Promise(r=>setTimeout(r,120)); } solving=false; btnSolve.disabled=false; }
+  async function autoSolve(){
+    if(solving) return; solving=true; btnSolve.disabled=true;
+    const moves=[];
+    const solve=(n,from,aux,to)=>{
+      if(n===0) return;
+      solve(n-1,from,to,aux);
+      moves.push([from,to]);
+      solve(n-1,aux,from,to);
+    };
+    solve(N,0,1,2);
+    for(const [a,b] of moves){
+      if(!solving) break;
+      move(a,b);
+      await new Promise(r=>setTimeout(r,120));
+    }
+    solving=false; btnSolve.disabled=false;
+  }
 
   // 이벤트
   pegs.forEach(peg=>{
     peg.addEventListener('click', ()=>{
       if(solving) return; const i=+peg.dataset.i;
-      if(selectedPeg===null){ if(stacks[i].length===0){ showToast('이동할 원반이 없어요'); return; } selectedPeg=i; layout(); }
-      else{ if(i===selectedPeg){ selectedPeg=null; layout(); return; } move(selectedPeg,i); }
+      if(selectedPeg===null){
+        if(stacks[i].length===0){ showToast('이동할 원반이 없어요'); return; }
+        selectedPeg=i; layout();
+      } else {
+        if(i===selectedPeg){ selectedPeg=null; layout(); return; }
+        move(selectedPeg,i);
+      }
     }, {passive:true});
   });
 
-  btnUndo.addEventListener('click', ()=>{ if(history.length===0) return; const [from,to]=history.pop(); const disk=stacks[to].pop(); stacks[from].push(disk); selectedPeg=null; layout(); });
-  btnReset.addEventListener('click', ()=>{ init(); });
-  btnSolve.addEventListener('click', ()=>{ autoSolve(); });
+  btnUndo.addEventListener('click', ()=>{
+    if(history.length===0) return;
+    const [from,to]=history.pop(); const disk=stacks[to].pop();
+    stacks[from].push(disk); selectedPeg=null; layout();
+  });
+  btnReset.addEventListener('click', init);
+  btnSolve.addEventListener('click', autoSolve);
 
   // 오버레이 동작
-  // 일부 환경에서 pointerdown이 클릭 처리에 영향을 주는 사례가 있어 제거
-// btnStart.addEventListener('pointerdown', (ev)=>{ ev.preventDefault(); ev.stopPropagation(); }); ev.stopPropagation(); });
+  // (참고) pointerdown 선처리 이슈가 있는 환경이 있어 비활성화. 필요 시 주석을 풀되 중복 호출 주의.
+  // btnStart.addEventListener('pointerdown', (ev)=>{ ev.preventDefault(); ev.stopPropagation(); });
+
   btnStart.addEventListener('click', (ev)=>{
     ev.preventDefault(); ev.stopPropagation();
-    // 시작 시 다른 오버레이가 떠 있었다면 닫기
     overlayStageClear.classList.remove('show');
     overlayFinal.classList.remove('show');
     overlayStart.classList.remove('show');
     init();
   });
+
   // 모바일 탭 대응
   btnStart.addEventListener('touchstart', (ev)=>{
     ev.preventDefault(); ev.stopPropagation();
@@ -215,19 +237,33 @@
     overlayFinal.classList.remove('show');
     overlayStart.classList.remove('show');
     init();
-  }, {passive:false}); ev.stopPropagation(); overlayStart.classList.remove('show'); init(); });
-  btnStartScreen.addEventListener('click', ()=>{ overlayFinal.classList.remove('show'); overlayStageClear.classList.remove('show'); overlayStart.classList.add('show'); });
+  }, {passive:false});
 
-  function goNextStage(){ if(stageIndex<stages.length-1){ stageIndex++; init(); overlayStageClear.classList.remove('show'); } else { overlayStageClear.classList.remove('show'); overlayFinal.classList.add('show'); } }
+  btnStartScreen.addEventListener('click', ()=>{
+    overlayFinal.classList.remove('show');
+    overlayStageClear.classList.remove('show');
+    overlayStart.classList.add('show');
+  });
+
+  function goNextStage(){
+    if(stageIndex<stages.length-1){
+      stageIndex++; init(); overlayStageClear.classList.remove('show');
+    } else {
+      overlayStageClear.classList.remove('show'); overlayFinal.classList.add('show');
+    }
+  }
   btnProceed.addEventListener('click', goNextStage);
   btnNext.addEventListener('click', ()=>{ if(!btnNext.disabled) goNextStage(); });
-  btnFinalToStart.addEventListener('click', ()=>{ overlayFinal.classList.remove('show'); overlayStart.classList.add('show'); stageIndex=0; init(); });
+  btnFinalToStart.addEventListener('click', ()=>{
+    overlayFinal.classList.remove('show'); overlayStart.classList.add('show'); stageIndex=0; init();
+  });
 
-  // 키보드 치트: ` (Backquote)로 암호화, Enter=자동해결, ←/→=스테이지 이동
+  // 키보드 치트: ` (Backquote) → 암호화, Enter=자동해결, ←/→=스테이지 이동
   let cheatArmed=false; let cheatTimer=null;
   function armCheat(){ cheatArmed=true; clearTimeout(cheatTimer); cheatTimer=setTimeout(()=>cheatArmed=false,1500); }
   function prevStage(){ if(stageIndex>0){ stageIndex--; overlayStageClear.classList.remove('show'); overlayFinal.classList.remove('show'); init(); } }
   function nextStage(){ if(stageIndex<stages.length-1){ stageIndex++; overlayStageClear.classList.remove('show'); init(); } else { overlayFinal.classList.add('show'); } }
+
   window.addEventListener('keydown', (e)=>{
     if(e.code==='Backquote'){ armCheat(); }
     else if(e.key==='Enter' && cheatArmed){ cheatArmed=false; clearTimeout(cheatTimer); autoSolve(); }
