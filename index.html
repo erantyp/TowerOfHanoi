@@ -14,8 +14,8 @@
   html,body{height:100%}
   body{margin:0; font-family: ui-sans-serif, system-ui, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", Segoe UI, Roboto, Helvetica, Arial; color:var(--fg); background:var(--bg); display:flex; align-items:center; justify-content:center; padding:20px}
   .app{width:min(1100px,100%)}
-  .topbar{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px}
-  .title{font-weight:900; letter-spacing:.2px; font-size:clamp(18px,3vw,28px)}
+  .topbar{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px; flex-wrap:wrap}
+  .title{display:flex; align-items:center; gap:8px; font-weight:900; letter-spacing:.2px; font-size:clamp(18px,3vw,28px)}
   .controls{display:flex; gap:8px; flex-wrap:wrap}
   button{background:#111827; border:1px solid #262b36; color:var(--fg); padding:8px 12px; border-radius:10px; cursor:pointer; font-weight:700; transition:.15s transform,.15s opacity}
   button:hover{transform:translateY(-1px)}
@@ -32,7 +32,8 @@
   .disk[data-sel="1"]{outline:3px solid var(--accent2)}
 
   .legend{margin-top:10px; color:var(--muted); font-size:14px}
-  .pill{padding:6px 10px; border-radius:999px; background:#0b1220; border:1px solid #233047}
+  .pill{padding:6px 10px; border-radius:999px; background:#0b1220; border:1px solid #233047; font-weight:800}
+  .stats{display:flex; gap:6px; flex-wrap:wrap}
 
   .toast{position:fixed; right:16px; bottom:16px; background:#0b1220; border:1px solid #1f2a44; padding:10px 12px; border-radius:10px; font-size:14px; opacity:0; transform:translateY(8px); transition:.2s}
   .toast.show{opacity:1; transform:translateY(0)}
@@ -41,12 +42,25 @@
   .overlay.show{display:flex}
   .card{background:var(--card); border:1px solid var(--card-br); border-radius:16px; padding:22px; width:min(92vw,560px); text-align:center}
   .card h1{margin:0 0 10px}
+  .small{color:var(--muted); font-size:14px}
+  .table{margin-top:10px; width:100%; border-collapse:separate; border-spacing:0 6px; font-size:14px}
+  .table tr{background:#0b1220}
+  .table td{padding:8px 10px; border-top:1px solid #1f2a44; border-bottom:1px solid #1f2a44}
+  .table td:first-child{border-left:1px solid #1f2a44; border-top-left-radius:8px; border-bottom-left-radius:8px}
+  .table td:last-child{border-right:1px solid #1f2a44; border-top-right-radius:8px; border-bottom-right-radius:8px}
 </style>
 </head>
 <body>
   <div class="app">
     <div class="topbar">
-      <div class="title">🗼 하노이의 탑 <span class="pill" id="stageLabel">Stage 1 · 3개</span></div>
+      <div class="title">
+        🗼 하노이의 탑
+        <span class="pill" id="stageLabel">Stage 1 · 3개</span>
+        <span class="stats">
+          <span class="pill" id="moveLabel">이동 0회</span>
+          <span class="pill" id="timeLabel">00:00</span>
+        </span>
+      </div>
       <div class="controls">
         <button id="btnStartScreen">초기 화면</button>
         <button id="btnReset">리셋</button>
@@ -81,7 +95,7 @@
   <div class="overlay" id="overlayStageClear">
     <div class="card">
       <h1 id="stageClearTitle">스테이지 클리어!</h1>
-      <p id="stageClearDesc">다음 스테이지로 진행할 수 있어요.</p>
+      <p id="stageClearDesc" class="small"></p>
       <button id="btnProceed" type="button">다음 스테이지 ▶</button>
     </div>
   </div>
@@ -90,7 +104,9 @@
   <div class="overlay" id="overlayFinal">
     <div class="card">
       <h1>모든 스테이지 완료 🎉</h1>
-      <p>초기 화면으로 돌아가 다시 플레이할 수 있어요.</p>
+      <p class="small">스테이지별 기록</p>
+      <table class="table" id="finalTable"></table>
+      <p class="small" id="finalSum"></p>
       <button id="btnFinalToStart" type="button">초기 화면으로</button>
     </div>
   </div>
@@ -114,6 +130,10 @@
   const btnProceed = document.getElementById('btnProceed');
   const btnFinalToStart = document.getElementById('btnFinalToStart');
   const stageLabel = document.getElementById('stageLabel');
+  const moveLabel = document.getElementById('moveLabel');
+  const timeLabel = document.getElementById('timeLabel');
+  const finalTable = document.getElementById('finalTable');
+  const finalSum = document.getElementById('finalSum');
   const toast = document.getElementById('toast');
 
   let stacks=[[],[],[]];
@@ -121,12 +141,39 @@
   let selectedPeg=null;
   let solving=false;
 
+  // 기록
+  let moveCount=0;
+  let startTime=0;
+  let timerId=null;
+  const results=[]; // {n, moves, secs}
+
   const diskColors = ['#93c5fd','#60a5fa','#3b82f6','#2563eb','#1d4ed8','#10b981','#14b8a6'];
 
   const showToast=(m)=>{ toast.textContent=m; toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'),1100); };
   const canMove=(from,to)=>{ if(from===to) return false; if(stacks[from].length===0) return false; const disk=stacks[from][stacks[from].length-1]; const top=stacks[to][stacks[to].length-1]; return top===undefined || disk<top; };
 
+  const mmss = (secs)=>{
+    const m = Math.floor(secs/60).toString().padStart(2,'0');
+    const s = Math.floor(secs%60).toString().padStart(2,'0');
+    return `${m}:${s}`;
+  };
+
   function updateStageLabel(){ stageLabel.textContent=`Stage ${stageIndex+1} · ${N}개`; }
+  function updateStatsUI(){
+    moveLabel.textContent = `이동 ${moveCount}회`;
+    const secs = (Date.now()-startTime)/1000;
+    timeLabel.textContent = mmss(secs);
+  }
+  function startTimer(){
+    clearInterval(timerId);
+    startTime = Date.now();
+    timerId = setInterval(updateStatsUI, 250);
+    updateStatsUI();
+  }
+  function stopTimer(){
+    clearInterval(timerId);
+    timerId=null;
+  }
 
   function layout(){
     pegs.forEach(peg=>{ peg.innerHTML = '<div class="pole"></div><div class="base"></div><div class="slot"></div>'; });
@@ -158,22 +205,28 @@
     updateStageLabel();
     stacks=[[],[],[]]; history=[]; selectedPeg=null; solving=false;
     for(let s=N; s>=1; s--) stacks[0].push(s);
-    layout();
+    moveCount=0; startTimer();
+    layout(); updateStatsUI();
   }
 
   function move(from,to){
     if(!canMove(from,to)) { showToast('그 이동은 불가해요'); return false; }
-    const disk=stacks[from].pop(); stacks[to].push(disk); history.push([from,to]); selectedPeg=null; layout();
+    const disk=stacks[from].pop(); stacks[to].push(disk); history.push([from,to]); selectedPeg=null;
+    moveCount++; layout(); updateStatsUI();
     checkWin(); return true;
   }
 
   function checkWin(){
-    // 성공 조건: 시작 기둥(0)이 아닌 어느 한 기둥(1 또는 2)에 모든 원반이 모이면 클리어
     if(stacks[1].length===N || stacks[2].length===N){
+      stopTimer();
+      const secs = (Date.now()-startTime)/1000;
+      results[stageIndex] = { n:N, moves:moveCount, secs };
       document.getElementById('stageClearTitle').textContent=`Stage ${stageIndex+1} 클리어!`;
-      document.getElementById('stageClearDesc').textContent=(stageIndex<stages.length-1)?`다음은 ${stages[stageIndex+1]}개 스테이지입니다.`:'모든 스테이지를 완료했습니다!';
+      const nextText = (stageIndex<stages.length-1)?`다음은 ${stages[stageIndex+1]}개 스테이지입니다.`:'모든 스테이지를 완료했습니다!';
+      document.getElementById('stageClearDesc').innerHTML =
+        `이동 <b>${moveCount}</b>회 · 시간 <b>${mmss(secs)}</b><br>${nextText}`;
       overlayStageClear.classList.add('show');
-      btnNext.disabled=false; // 상단 버튼도 활성화
+      btnNext.disabled=false;
     }
   }
 
@@ -213,15 +266,14 @@
   btnUndo.addEventListener('click', ()=>{
     if(history.length===0) return;
     const [from,to]=history.pop(); const disk=stacks[to].pop();
-    stacks[from].push(disk); selectedPeg=null; layout();
+    stacks[from].push(disk); selectedPeg=null;
+    moveCount = Math.max(0, moveCount-1);
+    layout(); updateStatsUI();
   });
   btnReset.addEventListener('click', init);
   btnSolve.addEventListener('click', autoSolve);
 
-  // 오버레이 동작
-  // (참고) pointerdown 선처리 이슈가 있는 환경이 있어 비활성화. 필요 시 주석을 풀되 중복 호출 주의.
-  // btnStart.addEventListener('pointerdown', (ev)=>{ ev.preventDefault(); ev.stopPropagation(); });
-
+  // 오버레이
   btnStart.addEventListener('click', (ev)=>{
     ev.preventDefault(); ev.stopPropagation();
     overlayStageClear.classList.remove('show');
@@ -229,8 +281,6 @@
     overlayStart.classList.remove('show');
     init();
   });
-
-  // 모바일 탭 대응
   btnStart.addEventListener('touchstart', (ev)=>{
     ev.preventDefault(); ev.stopPropagation();
     overlayStageClear.classList.remove('show');
@@ -249,16 +299,30 @@
     if(stageIndex<stages.length-1){
       stageIndex++; init(); overlayStageClear.classList.remove('show');
     } else {
-      overlayStageClear.classList.remove('show'); overlayFinal.classList.add('show');
+      // 최종 요약 테이블 생성
+      finalTable.innerHTML = '';
+      const header = document.createElement('tr');
+      header.innerHTML = '<td>Stage</td><td>원반</td><td>이동</td><td>시간</td>';
+      finalTable.appendChild(header);
+      let sumMoves=0, sumSecs=0;
+      results.forEach((r, i)=>{
+        const tr=document.createElement('tr');
+        tr.innerHTML = `<td>${i+1}</td><td>${r?.n ?? '-'}</td><td>${r?.moves ?? '-'}</td><td>${r? mmss(r.secs): '-'}</td>`;
+        finalTable.appendChild(tr);
+        if(r){ sumMoves += r.moves; sumSecs += r.secs; }
+      });
+      finalSum.textContent = `총 이동 ${sumMoves}회 · 총 시간 ${mmss(sumSecs)}`;
+      overlayStageClear.classList.remove('show');
+      overlayFinal.classList.add('show');
     }
   }
   btnProceed.addEventListener('click', goNextStage);
   btnNext.addEventListener('click', ()=>{ if(!btnNext.disabled) goNextStage(); });
   btnFinalToStart.addEventListener('click', ()=>{
-    overlayFinal.classList.remove('show'); overlayStart.classList.add('show'); stageIndex=0; init();
+    overlayFinal.classList.remove('show'); overlayStart.classList.add('show'); stageIndex=0; results.length=0; init();
   });
 
-  // 키보드 치트: ` (Backquote) → 암호화, Enter=자동해결, ←/→=스테이지 이동
+  // 치트키
   let cheatArmed=false; let cheatTimer=null;
   function armCheat(){ cheatArmed=true; clearTimeout(cheatTimer); cheatTimer=setTimeout(()=>cheatArmed=false,1500); }
   function prevStage(){ if(stageIndex>0){ stageIndex--; overlayStageClear.classList.remove('show'); overlayFinal.classList.remove('show'); init(); } }
@@ -271,7 +335,7 @@
     else if(e.key==='ArrowRight' && cheatArmed){ cheatArmed=false; clearTimeout(cheatTimer); nextStage(); }
   }, {passive:true});
 
-  // 초기: 시작 오버레이 표시
+  // 초기
   overlayStart.classList.add('show');
 })();
 </script>
